@@ -1,4 +1,4 @@
-module github.com/jsnfwlr/go11y
+module github.com/cirruscomms/go11y
 
 go 1.25.0
 

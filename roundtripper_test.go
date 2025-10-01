@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jsnfwlr/go11y"
-	"github.com/jsnfwlr/go11y/testingContainers"
+	"github.com/cirruscomms/go11y"
+	"github.com/cirruscomms/go11y/testingContainers"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/testcontainers/testcontainers-go"
