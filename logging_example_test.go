@@ -7,7 +7,7 @@ func ExampleInitialise_justLogging() {
 	// the context-with-observability to another function that retrieves the
 	// logger from the context and uses it.
 
-	// TODO @jsnfwlr: Write the example
+	// TODO @cirruscomms: Write the example
 }
 
 func ExampleInitialise_loggingAndTracing() {
@@ -15,5 +15,5 @@ func ExampleInitialise_loggingAndTracing() {
 	// up tracing, create spans, and log messages with different severity
 	// levels, while also extending the context with additional information.
 
-	// TODO @jsnfwlr: Write the example
+	// TODO @cirruscomms: Write the example
 }

@@ -5,7 +5,7 @@ tools:
 
 test:
 	@echo "Running tests..."
-	@go test ./... -json -cover -count 1 | tparse -progress -trimpath "github.com/jsnfwlr/go11y" -all
+	@go test ./... -json -cover -count 1 | tparse -progress -trimpath "github.com/cirruscomms/go11y" -all
 
 coverage:
 	@echo "Generating coverage report..."

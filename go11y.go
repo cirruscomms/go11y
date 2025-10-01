@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jsnfwlr/go11y/db"
-	"github.com/jsnfwlr/go11y/etc/migrations"
+	"github.com/cirruscomms/go11y/db"
+	"github.com/cirruscomms/go11y/etc/migrations"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -47,7 +47,7 @@ type ObserverDB struct {
 
 type go11yContextKey string
 
-var obsKeyInstance go11yContextKey = "jsnfwlr/go11y"
+var obsKeyInstance go11yContextKey = "cirruscomms/go11y"
 
 var og *Observer
 

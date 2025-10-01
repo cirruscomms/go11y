@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/jsnfwlr/go11y"
+	"github.com/cirruscomms/go11y"
 )
 
 func TestLoggingContext(t *testing.T) {
