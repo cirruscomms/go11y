@@ -34,7 +34,7 @@ func TestLoggingContext(t *testing.T) {
 	ctx, o = go11y.Extend(ctx, nil, "", go11y.FieldRequestID, uuid.New())
 	o.Info("TestLoggingContext", nil, "info", 1)
 	ctx = AddFieldsToLoggerInContext(t, ctx, go11y.FieldRequestMethod, "GET", go11y.FieldRequestPath, "/api/v1/test")
-	ctx, o = go11y.Get(ctx)
+	_, o = go11y.Get(ctx)
 	o.Info("TestLoggingContext", nil, "info", 2)
 
 	// @TODO: read the buffer and check the output matches expected log format
