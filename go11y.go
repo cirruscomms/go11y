@@ -387,7 +387,7 @@ func (o *Observer) End() {
 
 // InitialiseTestLogger set up a logger for use in tests - no tracing, no db logging
 func InitialiseTestLogger(ctx context.Context, level slog.Level) (ctxWithObserver context.Context, observer *Observer, fault error) {
-	cfg := CreateConfig(level, "", "", []string{}, []string{})
+	cfg := CreateConfig(level, "", "", "", []string{}, []string{})
 
 	ctx, o, err := Initialise(ctx, cfg, os.Stdout)
 	if err != nil {
