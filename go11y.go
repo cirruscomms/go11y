@@ -389,7 +389,7 @@ func (o *Observer) End() {
 func InitialiseTestLogger(ctx context.Context, level slog.Level) (ctxWithObserver context.Context, observer *Observer, fault error) {
 	cfg := CreateConfig(level, "", "", []string{}, []string{})
 
-	ctx, o, err := Initialise(ctx, cfg, nil)
+	ctx, o, err := Initialise(ctx, cfg, os.Stdout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialise observer: %w", err)
 	}
@@ -401,7 +401,7 @@ func InitialiseTestLogger(ctx context.Context, level slog.Level) (ctxWithObserve
 func InitialiseTestTracer(ctx context.Context, level slog.Level, otelURL, serviceName string) (ctxWithObserver context.Context, observer *Observer, fault error) {
 	cfg := CreateConfig(level, otelURL, "", serviceName, []string{}, []string{})
 
-	ctx, o, err := Initialise(ctx, cfg, nil)
+	ctx, o, err := Initialise(ctx, cfg, os.Stdout)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to initialise observer: %w", err)
 	}
