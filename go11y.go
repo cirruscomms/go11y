@@ -384,3 +384,27 @@ func (o *Observer) End() {
 		o.span = nil
 	}
 }
+
+// InitialiseTestLogger set up a logger for use in tests - no tracing, no db logging
+func InitialiseTestLogger(ctx context.Context, level slog.Level) (ctxWithObserver context.Context, observer *Observer, fault error) {
+	cfg := CreateConfig(level, "", "", []string{}, []string{})
+
+	ctx, o, err := Initialise(ctx, cfg, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialise observer: %w", err)
+	}
+
+	return ctx, o, nil
+}
+
+// InitialiseTestTracer set up a tracer for use in tests - with tracing, but no db logging
+func InitialiseTestTracer(ctx context.Context, level slog.Level, otelURL, serviceName string) (ctxWithObserver context.Context, observer *Observer, fault error) {
+	cfg := CreateConfig(level, otelURL, "", serviceName, []string{}, []string{})
+
+	ctx, o, err := Initialise(ctx, cfg, nil)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to initialise observer: %w", err)
+	}
+
+	return ctx, o, nil
+}
