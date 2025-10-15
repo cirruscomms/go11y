@@ -87,6 +87,7 @@ func (o *Observer) Fatal(msg string, err error, ephemeralArgs ...any) {
 	}
 	ephemeralArgs = append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)
 	o.log(context.Background(), 3, LevelFatal, msg, ephemeralArgs...)
+	os.Exit(1)
 }
 
 // Fatal is intended to be called before the observer has been configured.
