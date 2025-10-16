@@ -111,7 +111,7 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput io.Writer, init
 		if err != nil {
 			return ctx, nil, fmt.Errorf("could not migrate database: %w", err)
 		}
-		og.Debug("Database migrated successfully", nil)
+		og.Debug("Database migrated successfully")
 	}
 
 	ctx = context.WithValue(ctx, obsKeyInstance, og)
@@ -128,7 +128,7 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput io.Writer, init
 
 func Reset(ctxWithGo11y context.Context) (ctxWithResetObservability context.Context) {
 	og.logger = slog.New(slog.NewJSONHandler(og.output, defaultOptions(og.cfg)))
-	og.Debug("Observer reset", nil)
+	og.Debug("Observer reset")
 	og.stableArgs = []any{}
 
 	return context.WithValue(ctxWithGo11y, obsKeyInstance, og)
@@ -259,9 +259,9 @@ func defaultReplacer(trimModules, trimPaths []string) func(groups []string, a sl
 	}
 }
 
-func (o *Observer) log(ctx context.Context, skipCallers int, level slog.Level, msg string, args ...any) {
+func (o *Observer) log(ctx context.Context, skipCallers int, level slog.Level, msg string, args ...any) (levelEnabled bool) {
 	if o.logger == nil || !o.logger.Enabled(ctx, level) {
-		return
+		return false
 	}
 	var pc uintptr
 	var pcs [1]uintptr
@@ -279,6 +279,8 @@ func (o *Observer) log(ctx context.Context, skipCallers int, level slog.Level, m
 		ctx = context.Background()
 	}
 	_ = o.logger.Handler().Handle(ctx, r)
+
+	return true
 }
 
 func (o *Observer) store(ctx context.Context, url, method string, statusCode int32, duration time.Duration, requestBody, responseBody []byte, requestHeaders, responseHeaders http.Header) (fault error) {
