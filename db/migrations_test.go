@@ -38,7 +38,7 @@ func TestFileSystem(t *testing.T) {
 	}
 }
 
-func TesDatabase(t *testing.T) {
+func TestDatabase(t *testing.T) {
 	col, err := migrations.New()
 	if err != nil {
 		t.Fatalf("could not create the embedded filesystem: %v", err)

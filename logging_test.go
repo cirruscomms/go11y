@@ -30,7 +30,7 @@ func TestLoggingContext(t *testing.T) {
 		o.Close()
 	}()
 
-	o.Fatal("Test Logging Context", errors.New("TestLoggingContext"), nil, "fatal", 1)
+	o.Error("Test Logging Context", errors.New("TestLoggingContext"), go11y.SeverityHighest, "fatal", 1)
 	ctx, o = go11y.Extend(ctx, nil, "", go11y.FieldRequestID, uuid.New())
 	o.Info("TestLoggingContext", nil, "info", 1)
 	ctx = AddFieldsToLoggerInContext(t, ctx, go11y.FieldRequestMethod, "GET", go11y.FieldRequestPath, "/api/v1/test")

@@ -121,7 +121,7 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput io.Writer, init
 
 	slog.SetDefault(og.logger)
 
-	fmt.Println("Initialised observer with context")
+	og.Info("Initialised observer with context")
 
 	return ctx, og, nil
 }
