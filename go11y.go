@@ -272,7 +272,7 @@ func (o *Observer) log(ctx context.Context, skipCallers int, level slog.Level, m
 	r := slog.NewRecord(time.Now(), level, msg, pc)
 
 	if len(args) != 0 {
-		r.Add(args...)
+		r.Add(DeduplicateArgs(args)...)
 	}
 
 	if ctx == nil {

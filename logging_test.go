@@ -49,3 +49,80 @@ func AddFieldsToLoggerInContext(t *testing.T, ctx context.Context, args ...any) 
 
 	return c
 }
+
+func TestDeduplication(t *testing.T) {
+	testCases := []struct {
+		name      string
+		input     []any
+		expected  []any
+		dupedKeys []string
+	}{
+		{
+			name: "no duplicates",
+			input: []any{
+				"key1", "value1",
+				"key2", "value2",
+			},
+			expected: []any{
+				"key1", "value1",
+				"key2", "value2",
+			},
+			dupedKeys: []string{},
+		},
+		{
+			name: "just identical duplicates",
+			input: []any{
+				"key1", "value1",
+				"key1", "value1",
+			},
+			expected: []any{
+				"key1", "value1",
+			},
+			dupedKeys: []string{
+				"key1",
+			},
+		},
+		{
+			name: "just duplicate keys with different values",
+			input: []any{
+				"key1", "value1",
+				"key1", "value2",
+			},
+			expected: []any{
+				"key1", "value1",
+			},
+			dupedKeys: []string{
+				"key1",
+			},
+		},
+		{
+			name: "unique arg-pairs plus duplicate keys with different values",
+			input: []any{
+				"key1", "value1",
+				"key2", "value2",
+				"key1", "value2",
+			},
+			expected: []any{
+				"key1", "value1",
+				"key2", "value2",
+			},
+			dupedKeys: []string{
+				"key1",
+			},
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			result := go11y.DeduplicateArgs(tc.input)
+			if len(result) != len(tc.expected) {
+				t.Fatalf("expected length %d, got %d", len(tc.expected), len(result))
+			}
+
+			for i := range result {
+				if result[i] != tc.expected[i] {
+					t.Errorf("at index %d, expected %v, got %v", i, tc.expected[i], result[i])
+				}
+			}
+		})
+	}
+}

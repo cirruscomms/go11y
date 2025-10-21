@@ -16,7 +16,7 @@ import (
 // source
 type Configurator interface {
 	LogLevel() slog.Level
-	URL() string
+	OtelURL() string
 	DBConStr() string
 	ServiceName() string
 	TrimPaths() []string
@@ -97,9 +97,9 @@ func (c *Configuration) LogLevel() slog.Level {
 	return c.logLevel
 }
 
-// URL returns the configured OpenTelemetry URL (scheme, host, port, path).
+// OtelURL returns the configured OpenTelemetry URL (scheme, host, port, path).
 // This method is part of the Configurator interface.
-func (c *Configuration) URL() string {
+func (c *Configuration) OtelURL() string {
 	return c.otelURL
 }
 

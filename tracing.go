@@ -35,12 +35,12 @@ func tracerProvider(ctx context.Context, cfg Configurator) (tracerProvider *otel
 	}
 
 	options := []otelExportTraceHTTP.Option{
-		otelExportTraceHTTP.WithEndpointURL(cfg.URL()),
+		otelExportTraceHTTP.WithEndpointURL(cfg.OtelURL()),
 		otelExportTraceHTTP.WithCompression(otelExportTraceHTTP.GzipCompression),
 		otelExportTraceHTTP.WithHeaders(headers),
 	}
 
-	if !strings.HasPrefix(cfg.URL(), "https://") {
+	if !strings.HasPrefix(cfg.OtelURL(), "https://") {
 		options = append(options, otelExportTraceHTTP.WithInsecure())
 	}
 

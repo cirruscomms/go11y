@@ -61,35 +61,39 @@ func LogRequest(next http.Handler) http.Handler {
 
 		requestID := GetRequestID(ctx)
 
-		tracer := otel.Tracer(requestID)
-
 		ctx = Reset(ctx)
 
 		args := []any{
-			"origin", Origin{
+			"origin",
+			Origin{
 				ClientIP:  r.RemoteAddr,
 				UserAgent: r.UserAgent(),
 				Method:    r.Method,
 				Path:      r.URL.Path,
 			},
+			FieldRequestID, requestID,
 		}
 
-		// tracer
-		opts := []trace.SpanStartOption{
-			trace.WithSpanKind(trace.SpanKindServer),
-			trace.WithAttributes(argsToAttributes(args...)...),
+		var span trace.Span
+
+		if og.cfg.OtelURL() != "" {
+			tracer := otel.Tracer(requestID)
+
+			// tracer
+			opts := []trace.SpanStartOption{
+				trace.WithSpanKind(trace.SpanKindServer),
+				trace.WithAttributes(argsToAttributes(args...)...),
+			}
+			_, span = tracer.Start(ctx, "HTTP "+r.Method+" "+r.URL.Path, opts...)
+
+			args = append(args,
+				FieldSpanID, span.SpanContext().SpanID(),
+				FieldTraceID, span.SpanContext().TraceID(),
+			)
 		}
-
-		ctx, span := tracer.Start(ctx, "HTTP "+r.Method+" "+r.URL.Path, opts...)
-
-		args = append(args,
-			FieldSpanID, span.SpanContext().SpanID(),
-			FieldTraceID, span.SpanContext().TraceID(),
-		)
 
 		ctx, o := Extend(ctx, args...)
-
-		o.Debug("request received", span)
+		o.Debug("request received")
 
 		r = r.WithContext(ctx)
 
@@ -98,7 +102,10 @@ func LogRequest(next http.Handler) http.Handler {
 
 		// Log the response
 		// log.Printf("Response sent for: %s %s", r.Method, r.URL.Path)
-		o.Debug("request processed", span)
-		span.End()
+		o.Debug("request processed", args...)
+
+		if og.cfg.OtelURL() != "" {
+			span.End()
+		}
 	})
 }

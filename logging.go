@@ -2,15 +2,16 @@ package go11y
 
 import (
 	"context"
+	"fmt"
 	"os"
+	"slices"
 )
 
 // Develop logs a development-only message and adds an event to the span if available.
 func (o *Observer) Develop(msg string, ephemeralArgs ...any) {
-	ephemeralArgs = append(o.stableArgs, ephemeralArgs...)
 	logged := o.log(context.Background(), 3, LevelDevelop, msg, ephemeralArgs...)
 	if logged && o.span != nil {
-		attrs := argsToAttributes(ephemeralArgs...)
+		attrs := argsToAttributes(append(o.stableArgs, ephemeralArgs)...)
 		o.span.SetAttributes(attrs...)
 		o.span.AddEvent(msg)
 	}
@@ -18,10 +19,9 @@ func (o *Observer) Develop(msg string, ephemeralArgs ...any) {
 
 // Debug logs a debug message and adds an event to the span if available.
 func (o *Observer) Debug(msg string, ephemeralArgs ...any) {
-	ephemeralArgs = append(o.stableArgs, ephemeralArgs...)
 	logged := o.log(context.Background(), 3, LevelDebug, msg, ephemeralArgs...)
 	if logged && o.span != nil {
-		attrs := argsToAttributes(ephemeralArgs...)
+		attrs := argsToAttributes(append(o.stableArgs, ephemeralArgs)...)
 		o.span.SetAttributes(attrs...)
 		o.span.AddEvent(msg)
 	}
@@ -29,10 +29,9 @@ func (o *Observer) Debug(msg string, ephemeralArgs ...any) {
 
 // Info logs an informational message and adds an event to the span if available.
 func (o *Observer) Info(msg string, ephemeralArgs ...any) {
-	ephemeralArgs = append(o.stableArgs, ephemeralArgs...)
 	logged := o.log(context.Background(), 3, LevelInfo, msg, ephemeralArgs...)
 	if logged && o.span != nil {
-		attrs := argsToAttributes(ephemeralArgs...)
+		attrs := argsToAttributes(append(o.stableArgs, ephemeralArgs)...)
 		o.span.SetAttributes(attrs...)
 		o.span.AddEvent(msg)
 	}
@@ -40,10 +39,9 @@ func (o *Observer) Info(msg string, ephemeralArgs ...any) {
 
 // Notice logs a notice message and adds an event to the span if available.
 func (o *Observer) Notice(msg string, ephemeralArgs ...any) {
-	ephemeralArgs = append(o.stableArgs, ephemeralArgs...)
 	logged := o.log(context.Background(), 3, LevelNotice, msg, ephemeralArgs...)
 	if logged && o.span != nil {
-		attrs := argsToAttributes(ephemeralArgs...)
+		attrs := argsToAttributes(append(o.stableArgs, ephemeralArgs)...)
 		o.span.SetAttributes(attrs...)
 		o.span.AddEvent(msg)
 	}
@@ -51,10 +49,9 @@ func (o *Observer) Notice(msg string, ephemeralArgs ...any) {
 
 // Warn logs a warning message and adds an event to the span if available.
 func (o *Observer) Warning(msg string, ephemeralArgs ...any) {
-	ephemeralArgs = append(o.stableArgs, ephemeralArgs...)
 	logged := o.log(context.Background(), 3, LevelWarning, msg, ephemeralArgs...)
 	if logged && o.span != nil {
-		attrs := argsToAttributes(ephemeralArgs...)
+		attrs := argsToAttributes(append(o.stableArgs, ephemeralArgs)...)
 		o.span.SetAttributes(attrs...)
 		o.span.AddEvent(msg)
 	}
@@ -67,11 +64,9 @@ func (o *Observer) Warn(msg string, ephemeralArgs ...any) {
 
 // Error logs an error message, records the error in the span if available, and sets the severity.
 func (o *Observer) Error(msg string, err error, severity string, ephemeralArgs ...any) {
-	ephemeralArgs = append(o.stableArgs, ephemeralArgs...)
-	ephemeralArgs = append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)
-	logged := o.log(context.Background(), 3, LevelError, msg, ephemeralArgs...)
+	logged := o.log(context.Background(), 3, LevelFatal, msg, append(ephemeralArgs, "error", err.Error(), "severity", severity)...)
 	if logged && o.span != nil {
-		attrs := argsToAttributes(ephemeralArgs...)
+		attrs := argsToAttributes(append(o.stableArgs, ephemeralArgs)...)
 		o.span.SetAttributes(attrs...)
 		o.span.RecordError(err)
 	}
@@ -79,11 +74,9 @@ func (o *Observer) Error(msg string, err error, severity string, ephemeralArgs .
 
 // Fatal logs a fatal error message, records the error in the span if available, and sets the severity to highest.
 func (o *Observer) Fatal(msg string, err error, ephemeralArgs ...any) {
-	ephemeralArgs = append(o.stableArgs, ephemeralArgs...)
-	ephemeralArgs = append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)
-	logged := o.log(context.Background(), 3, LevelFatal, msg, ephemeralArgs...)
+	logged := o.log(context.Background(), 3, LevelFatal, msg, append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)...)
 	if logged && o.span != nil {
-		attrs := argsToAttributes(ephemeralArgs...)
+		attrs := argsToAttributes(append(o.stableArgs, ephemeralArgs)...)
 		o.span.SetAttributes(attrs...)
 		o.span.RecordError(err)
 	}
@@ -108,4 +101,23 @@ func Fatal(msg string, err error, ephemeralArgs ...any) {
 	ephemeralArgs = append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)
 	o.log(ctx, 3, LevelFatal, msg, ephemeralArgs...)
 	os.Exit(1)
+}
+
+func DeduplicateArgs(args []any) (deduped []any) {
+	keys := []string{}
+	uniq := []any{}
+
+	for i := 0; i < len(args); i += 2 {
+		if len(args) >= i+2 {
+			key := fmt.Sprintf("%v", args[i])
+			if slices.Contains(keys, key) {
+				continue
+			}
+
+			keys = append(keys, key)
+			uniq = append(uniq, args[i], args[i+1])
+		}
+	}
+
+	return uniq
 }

@@ -181,18 +181,6 @@ func DBStoreRoundTripper(next http.RoundTripper) http.RoundTripper {
 	})
 }
 
-func RedactHeaders(headers http.Header) http.Header {
-	redactedHeaders := make(http.Header)
-	for key, values := range headers {
-		if key == "Authorization" || key == "Cookie" {
-			redactedHeaders[key] = []string{"REDACTED"}
-		} else {
-			redactedHeaders[key] = values
-		}
-	}
-	return redactedHeaders
-}
-
 func PropagateRoundTripper(next http.RoundTripper) http.RoundTripper {
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
 		ctx := r.Context()
