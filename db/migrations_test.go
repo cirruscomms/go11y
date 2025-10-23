@@ -58,7 +58,7 @@ func TestDatabase(t *testing.T) {
 		t.Fatalf("could not load the configuration: %v", err)
 	}
 
-	ctx, o, err := go11y.Initialise(ctx, gCfg, nil)
+	ctx, o, err := go11y.Initialise(ctx, gCfg, nil, nil)
 	if err != nil {
 		t.Fatalf("could not initialise the observer: %v", err)
 	}
@@ -67,6 +67,15 @@ func TestDatabase(t *testing.T) {
 		m, err := db.NewMigrator(ctx, o, ctr, col)
 		if err != nil {
 			t.Fatalf("could not create the migrator: %v", err)
+		}
+
+		cv, err := m.GetCurrentVersion()
+		if err != nil {
+			t.Fatalf("could not get current version: %v", err)
+		}
+
+		if cv != 0 {
+			t.Fatalf("current version should be 0, got: %d", cv)
 		}
 
 		i, err := m.Info(-1)
@@ -79,6 +88,15 @@ func TestDatabase(t *testing.T) {
 		err = db.RunMigrations(ctx, o, ctr, col, -1, true)
 		if err != nil {
 			t.Fatalf("could not run the migrations: %v", err)
+		}
+
+		cv2, err := m.GetCurrentVersion()
+		if err != nil {
+			t.Fatalf("could not get current version: %v", err)
+		}
+
+		if cv2 != col.Steps() {
+			t.Fatalf("current version should be %d, got: %d", col.Steps(), cv)
 		}
 	})
 }

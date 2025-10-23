@@ -15,14 +15,15 @@ func TestLoggingContext(t *testing.T) {
 	t.Setenv("ENV", "test")
 	t.Setenv("LOG_LEVEL", "develop")
 
-	buf := new(bytes.Buffer)
+	bufOut := new(bytes.Buffer)
+	bufErr := new(bytes.Buffer)
 
 	cfg, err := go11y.LoadConfig()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
 	}
 
-	ctx, o, err := go11y.Initialise(context.Background(), cfg, buf)
+	ctx, o, err := go11y.Initialise(context.Background(), cfg, bufOut, bufErr)
 	if err != nil {
 		t.Fatalf("failed to initialise observer: %v", err)
 	}

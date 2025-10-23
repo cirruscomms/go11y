@@ -133,6 +133,10 @@ func ErrInvalidSequenceNumber(seq int32) error {
 	return fmt.Errorf("provided value '%d' is an invalid sequence number", seq)
 }
 
+func (m DBMigrator) GetCurrentVersion() (currentVersion int32, fault error) {
+	return m.migrator.GetCurrentVersion(m.context)
+}
+
 func (m DBMigrator) Info(stopAfter int32) (information Info, fault error) {
 	var err error
 

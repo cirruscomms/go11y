@@ -29,14 +29,15 @@ func TestRoundtripLogger(t *testing.T) {
 	t.Setenv("ENV", "test")
 	t.Setenv("LOG_LEVEL", "develop")
 
-	buf := new(bytes.Buffer)
+	bufOut := new(bytes.Buffer)
+	bufErr := new(bytes.Buffer)
 
 	cfg, err := go11y.LoadConfig()
 	if err != nil {
 		t.Fatalf("failed to load config: %v", err)
 	}
 
-	ctx, o, err := go11y.Initialise(ctx, cfg, buf)
+	ctx, o, err := go11y.Initialise(ctx, cfg, bufOut, bufErr)
 	if err != nil {
 		t.Fatalf("failed to initialise observer: %v", err)
 	}
@@ -61,7 +62,7 @@ func TestRoundtripLogger(t *testing.T) {
 
 	for {
 		pos := 0
-		l, err := buf.ReadString('\n') // Read the first line to ensure logging output is flushed
+		l, err := bufOut.ReadString('\n') // Read the first line to ensure logging output is flushed
 		if err != nil {
 			if err.Error() == "EOF" {
 				break // End of file reached, exit the loop
@@ -100,7 +101,7 @@ func TestRoundtripStorer(t *testing.T) {
 		t.Fatalf("failed to load config: %v", err)
 	}
 
-	_, o, err := go11y.Initialise(ctx, cfg, nil)
+	_, o, err := go11y.Initialise(ctx, cfg, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to initialise observer: %v", err)
 	}
@@ -167,7 +168,7 @@ func TestRoundtripperPropagator(t *testing.T) {
 		t.Fatalf("failed to load config: %v", err)
 	}
 
-	_, o, err := go11y.Initialise(ctx, cfg, nil)
+	_, o, err := go11y.Initialise(ctx, cfg, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to initialise observer: %v", err)
 	}

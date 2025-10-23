@@ -30,7 +30,8 @@ type Observer struct {
 	cfg           Configurator
 	output        io.Writer
 	level         slog.Level
-	logger        *slog.Logger
+	outLogger     *slog.Logger
+	errLogger     *slog.Logger
 	traceProvider *otelSDKTrace.TracerProvider
 	tracer        otelTrace.Tracer
 	stableArgs    []any
@@ -51,9 +52,13 @@ var obsKeyInstance go11yContextKey = "cirruscomms/go11y"
 
 var og *Observer
 
-func Initialise(ctx context.Context, cfg Configurator, logOutput io.Writer, initialArgs ...any) (ctxWithGo11y context.Context, observer *Observer, fault error) {
+func Initialise(ctx context.Context, cfg Configurator, logOutput, errOutput io.Writer, initialArgs ...any) (ctxWithGo11y context.Context, observer *Observer, fault error) {
 	if logOutput == nil {
 		logOutput = os.Stdout
+	}
+
+	if errOutput == nil {
+		errOutput = os.Stderr
 	}
 
 	var err error
@@ -75,7 +80,8 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput io.Writer, init
 	og = &Observer{
 		cfg:           cfg,
 		output:        logOutput,
-		logger:        slog.New(slog.NewJSONHandler(logOutput, opts)),
+		outLogger:     slog.New(slog.NewJSONHandler(logOutput, opts)),
+		errLogger:     slog.New(slog.NewJSONHandler(errOutput, opts)),
 		traceProvider: tp,
 		stableArgs:    initialArgs,
 	}
@@ -107,11 +113,23 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput io.Writer, init
 		if err != nil {
 			return ctx, nil, fmt.Errorf("could not create migrator: %w", err)
 		}
-		err = dbMig.Migrate()
+
+		state, err := dbMig.GetCurrentVersion()
 		if err != nil {
-			return ctx, nil, fmt.Errorf("could not migrate database: %w", err)
+			return ctx, nil, fmt.Errorf("could not determine the state of the database migrations: %w", err)
 		}
-		og.Debug("Database migrated successfully")
+
+		// Only run the go11y migration if no other migrations have been run so as not to break things for the system
+		// that is importing go11y. If a service already has migrations before it starts using go11y, it will need to
+		// duplicate the migrations etc/db/migrations/*.sql into the service's own migrations sequence, making sure to
+		// set the sequence of the duplicated versions to the next available step.
+		if state == 0 {
+			err = dbMig.Migrate()
+			if err != nil {
+				return ctx, nil, fmt.Errorf("could not migrate database: %w", err)
+			}
+			og.Debug("Database migrated successfully")
+		}
 	}
 
 	ctx = context.WithValue(ctx, obsKeyInstance, og)
@@ -119,7 +137,7 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput io.Writer, init
 		ctx, og = Extend(ctx, initialArgs...)
 	}
 
-	slog.SetDefault(og.logger)
+	slog.SetDefault(og.outLogger)
 
 	og.Info("Initialised observer with context")
 
@@ -127,7 +145,8 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput io.Writer, init
 }
 
 func Reset(ctxWithGo11y context.Context) (ctxWithResetObservability context.Context) {
-	og.logger = slog.New(slog.NewJSONHandler(og.output, defaultOptions(og.cfg)))
+	og.outLogger = slog.New(slog.NewJSONHandler(og.output, defaultOptions(og.cfg)))
+	og.errLogger = slog.New(slog.NewJSONHandler(og.output, defaultOptions(og.cfg)))
 	og.Debug("Observer reset")
 	og.stableArgs = []any{}
 
@@ -152,7 +171,8 @@ func Extend(ctx context.Context, newArgs ...any) (ctxWithGo11y context.Context, 
 	ctx, o := Get(ctx)
 
 	if len(newArgs) != 0 {
-		o.logger = o.logger.With(newArgs...)
+		o.outLogger = o.outLogger.With(newArgs...)
+		o.errLogger = o.errLogger.With(newArgs...)
 		o.stableArgs = o.AddArgs(newArgs...)
 	}
 
@@ -179,7 +199,8 @@ func Expand(ctx context.Context, tracer otelTrace.Tracer, spanName string, spanK
 	ctx, o := Span(ctx, tracer, spanName, spanKind)
 
 	if len(newArgs) != 0 {
-		o.logger = o.logger.With(newArgs...)
+		o.outLogger = o.outLogger.With(newArgs...)
+		o.errLogger = o.errLogger.With(newArgs...)
 		o.stableArgs = o.AddArgs(newArgs...)
 	}
 
@@ -260,7 +281,7 @@ func defaultReplacer(trimModules, trimPaths []string) func(groups []string, a sl
 }
 
 func (o *Observer) log(ctx context.Context, skipCallers int, level slog.Level, msg string, args ...any) (levelEnabled bool) {
-	if o.logger == nil || !o.logger.Enabled(ctx, level) {
+	if o.outLogger == nil || !o.outLogger.Enabled(ctx, level) {
 		return false
 	}
 	var pc uintptr
@@ -278,7 +299,31 @@ func (o *Observer) log(ctx context.Context, skipCallers int, level slog.Level, m
 	if ctx == nil {
 		ctx = context.Background()
 	}
-	_ = o.logger.Handler().Handle(ctx, r)
+	_ = o.outLogger.Handler().Handle(ctx, r)
+
+	return true
+}
+
+func (o *Observer) error(ctx context.Context, skipCallers int, level slog.Level, msg string, args ...any) (levelEnabled bool) {
+	if o.errLogger == nil || !o.errLogger.Enabled(ctx, level) {
+		return false
+	}
+	var pc uintptr
+	var pcs [1]uintptr
+	// skip [runtime.Callers, this function, this function's caller]
+	runtime.Callers(skipCallers, pcs[:])
+	pc = pcs[0]
+
+	r := slog.NewRecord(time.Now(), level, msg, pc)
+
+	if len(args) != 0 {
+		r.Add(DeduplicateArgs(args)...)
+	}
+
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	_ = o.errLogger.Handler().Handle(ctx, r)
 
 	return true
 }
@@ -387,26 +432,9 @@ func (o *Observer) End() {
 	}
 }
 
-// InitialiseTestLogger set up a logger for use in tests - no tracing, no db logging
-func InitialiseTestLogger(ctx context.Context, level slog.Level) (ctxWithObserver context.Context, observer *Observer, fault error) {
-	cfg := CreateConfig(level, "", "", "", []string{}, []string{})
-
-	ctx, o, err := Initialise(ctx, cfg, os.Stdout)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialise observer: %w", err)
-	}
-
-	return ctx, o, nil
-}
-
-// InitialiseTestTracer set up a tracer for use in tests - with tracing, but no db logging
-func InitialiseTestTracer(ctx context.Context, level slog.Level, otelURL, serviceName string) (ctxWithObserver context.Context, observer *Observer, fault error) {
-	cfg := CreateConfig(level, otelURL, "", serviceName, []string{}, []string{})
-
-	ctx, o, err := Initialise(ctx, cfg, os.Stdout)
-	if err != nil {
-		return nil, nil, fmt.Errorf("failed to initialise observer: %w", err)
-	}
-
-	return ctx, o, nil
+// InContext can be used to check if go11y has been added to a context before calling go11y.Get()
+// This is useful for other packages imported by services that use go11y as well as other services that still use the
+// go-logging package.
+func InContext(ctx context.Context) (response bool) {
+	return (ctx.Value(obsKeyInstance) != nil)
 }
