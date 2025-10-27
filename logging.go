@@ -99,7 +99,7 @@ func Fatal(msg string, err error, exitCode int, ephemeralArgs ...any) {
 	ctx := context.Background()
 	_, o, _ := Initialise(ctx, cfg, nil, os.Stderr)
 	ephemeralArgs = append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)
-	o.error(ctx, 3, LevelFatal, msg, ephemeralArgs...)
+	o.error(ctx, o.skipCallers, LevelFatal, msg, ephemeralArgs...)
 
 	if exitCode < 1 {
 		exitCode = 1
@@ -120,10 +120,11 @@ func Error(msg string, err error, severity string, ephemeralArgs ...any) {
 		trimModules: []string{},
 		trimPaths:   []string{},
 	}
+
 	ctx := context.Background()
 	_, o, _ := Initialise(ctx, cfg, nil, os.Stderr)
 	ephemeralArgs = append(ephemeralArgs, "error", err.Error(), "severity", severity)
-	o.error(ctx, 3, LevelFatal, msg, ephemeralArgs...)
+	o.error(ctx, o.skipCallers, LevelFatal, msg, ephemeralArgs...)
 }
 
 // DeduplicateArgs removes duplicate keys from a list of key-value pairs.

@@ -38,6 +38,7 @@ type Observer struct {
 	db            *ObserverDB
 	span          otelTrace.Span
 	spans         []otelTrace.Span
+	skipCallers   int
 }
 
 type ObserverDB struct {
@@ -84,6 +85,7 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput, errOutput io.W
 		errLogger:     slog.New(slog.NewJSONHandler(errOutput, opts)),
 		traceProvider: tp,
 		stableArgs:    initialArgs,
+		skipCallers:   3, // default to 3 but allow it to be increased via o.IncreaseDistance()
 	}
 
 	dbConnStr := cfg.DBConStr()
@@ -437,4 +439,8 @@ func (o *Observer) End() {
 // go-logging package.
 func InContext(ctx context.Context) (response bool) {
 	return (ctx.Value(obsKeyInstance) != nil)
+}
+
+func (o *Observer) IncreaseDistance(distance int) {
+	o.skipCallers += distance
 }

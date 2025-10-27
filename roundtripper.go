@@ -2,63 +2,14 @@ package go11y
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
-	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 )
-
-// AddTracingToHTTPClient wraps a HTTP client's transporter with OpenTelemetry instrumentation
-// If the provided httpClient is nil, it creates a new http.Client with a default
-// timeout of 2 minutes and a transport that is instrumented with OpenTelemetry
-// to
-// This allows us to capture request and response details in our telemetry data
-//
-// Note: Ensure that the OpenTelemetry SDK and otelhttp package are properly initialized before using this client
-func AddTracingToHTTPClient(httpClient *http.Client) (fault error) {
-	if httpClient == nil {
-		return errors.New("httpClient cannot be nil")
-	}
-
-	// Wrap the existing transport with OpenTelemetry tracing
-	httpClient.Transport = otelhttp.NewTransport(httpClient.Transport)
-	return nil
-}
-
-func AddPropagationToHTTPClient(httpClient *http.Client) (fault error) {
-	if httpClient == nil {
-		return errors.New("httpClient cannot be nil")
-	}
-
-	// Wrap the existing transport with OpenTelemetry tracing
-	httpClient.Transport = PropagateRoundTripper(httpClient.Transport)
-	return nil
-}
-
-func AddLoggingToHTTPClient(httpClient *http.Client) (fault error) {
-	if httpClient == nil {
-		return errors.New("httpClient cannot be nil")
-	}
-
-	// Wrap the existing transport with logging
-	httpClient.Transport = LogRoundTripper(httpClient.Transport)
-	return nil
-}
-
-func AddDBStoreToHTTPClient(httpClient *http.Client) (fault error) {
-	if httpClient == nil {
-		return errors.New("httpClient cannot be nil")
-	}
-
-	// Wrap the existing transport with logging
-	httpClient.Transport = DBStoreRoundTripper(httpClient.Transport)
-	return nil
-}
 
 type RoundTripperFunc func(*http.Request) (*http.Response, error)
 

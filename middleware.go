@@ -12,7 +12,10 @@ import (
 
 type requestIDKey string
 
-const RequestIDInstance requestIDKey = "requestID"
+const (
+	RequestIDInstance requestIDKey = "requestID"
+	RequestIDHeader   string       = "X-Swoop-RequestID"
+)
 
 func GetRequestID(ctx context.Context) string {
 	if ctx == nil {
@@ -35,7 +38,7 @@ func SetRequestID(next http.Handler) http.Handler {
 		ctx := context.WithValue(r.Context(), RequestIDInstance, requestID)
 
 		// Set the request ID in the response header
-		w.Header().Set("X-Request-ID", requestID)
+		w.Header().Set(RequestIDHeader, requestID)
 
 		// Call the next handler with the new context
 		next.ServeHTTP(w, r.WithContext(ctx))
@@ -101,7 +104,6 @@ func LogRequest(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 
 		// Log the response
-		// log.Printf("Response sent for: %s %s", r.Method, r.URL.Path)
 		o.Debug("request processed", args...)
 
 		if og.cfg.OtelURL() != "" {
