@@ -88,7 +88,7 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput, errOutput io.W
 		skipCallers:   3, // default to 3 but allow it to be increased via o.IncreaseDistance()
 	}
 
-	dbConnStr := cfg.DBConStr()
+	dbConnStr := cfg.DatabaseURL()
 	if dbConnStr != "" {
 		odb := &ObserverDB{}
 
@@ -141,7 +141,7 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput, errOutput io.W
 
 	slog.SetDefault(og.outLogger)
 
-	og.Info("Initialised observer with context")
+	og.Debug("Initialised observer with context")
 
 	return ctx, og, nil
 }

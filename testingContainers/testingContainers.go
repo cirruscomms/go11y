@@ -84,7 +84,7 @@ func (c DatabaseContainer) Hostname(t testing.TB, ctx context.Context) string {
 	return host
 }
 
-func (c DatabaseContainer) DBConStr() string {
+func (c DatabaseContainer) DatabaseURL() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", c.Username, c.Password, c.Host, c.Port, c.Database)
 }
 

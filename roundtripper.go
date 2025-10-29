@@ -85,7 +85,6 @@ func LogRoundTripper(next http.RoundTripper) http.RoundTripper {
 func DBStoreRoundTripper(next http.RoundTripper) http.RoundTripper {
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
 		ctx, o := Get(r.Context())
-
 		reqBody := []byte{}
 		if r.Body != nil {
 			defer func() {

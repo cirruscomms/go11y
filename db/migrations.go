@@ -63,7 +63,7 @@ func (m MigrationFS) Open(name string) (file fs.File, fault error) {
 }
 
 type Configurator interface {
-	DBConStr() string
+	DatabaseURL() string
 }
 
 type DBMigrator struct {
@@ -81,7 +81,7 @@ type FilesystemProvider interface {
 }
 
 func NewMigrator(ctx context.Context, logger Logger, connParams Configurator, fs FilesystemProvider) (migrator DBMigrator, fault error) {
-	conn, err := pgx.Connect(ctx, connParams.DBConStr())
+	conn, err := pgx.Connect(ctx, connParams.DatabaseURL())
 	if err != nil {
 		return DBMigrator{}, fmt.Errorf("could not connect to database: %w", err)
 	}
@@ -141,7 +141,7 @@ func (m DBMigrator) Info(stopAfter int32) (information Info, fault error) {
 	var err error
 
 	i := Info{
-		DBConnStr:  m.configuration.DBConStr(),
+		DBConnStr:  m.configuration.DatabaseURL(),
 		Migrations: MigrationInfo{},
 	}
 

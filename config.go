@@ -17,7 +17,7 @@ import (
 type Configurator interface {
 	LogLevel() slog.Level
 	OtelURL() string
-	DBConStr() string
+	DatabaseURL() string
 	ServiceName() string
 	TrimPaths() []string
 	TrimModules() []string
@@ -28,7 +28,7 @@ type Configuration struct {
 	logLevel    slog.Level
 	otelURL     string
 	strLevel    string
-	dbConStr    string
+	databaseURL string
 	serviceName string
 	trimModules []string
 	trimPaths   []string
@@ -37,7 +37,7 @@ type Configuration struct {
 type interimConfig struct {
 	StrLevel    string `env:"LOG_LEVEL" envDefault:"debug"`
 	OtelURL     string `env:"OTEL_URL" envDefault:""`
-	DBConStr    string `env:"DB_CONSTR" envDefault:""`
+	DatabaseURL string `env:"DB_CONSTR" envDefault:""`
 	ServiceName string `env:"OTEL_SERVICE_NAME" envDefault:""`
 	TrimModules string `env:"TRIM_MODULES" envDefault:""`
 	TrimPaths   string `env:"TRIM_PATHS" envDefault:""`
@@ -64,7 +64,7 @@ func LoadConfig() (cfg *Configuration, fault error) {
 
 	c := &Configuration{
 		otelURL:     h.OtelURL,
-		dbConStr:    h.DBConStr,
+		databaseURL: h.DatabaseURL,
 		strLevel:    h.StrLevel,
 		logLevel:    StringToLevel(h.StrLevel),
 		serviceName: h.ServiceName,
@@ -84,7 +84,7 @@ func CreateConfig(logLevel slog.Level, otelURL, dbConStr, serviceName string, tr
 		logLevel:    logLevel,
 		otelURL:     otelURL,
 		strLevel:    logLevel.String(),
-		dbConStr:    dbConStr,
+		databaseURL: dbConStr,
 		serviceName: serviceName,
 		trimModules: trimModules,
 		trimPaths:   trimPaths,
@@ -105,8 +105,8 @@ func (c *Configuration) OtelURL() string {
 
 // DBConStr returns the database connection string.
 // This method is part of the Configurator interface.
-func (c *Configuration) DBConStr() string {
-	return c.dbConStr
+func (c *Configuration) DatabaseURL() string {
+	return c.databaseURL
 }
 
 // ServiceName returns the configured service name for OpenTelemetry.
