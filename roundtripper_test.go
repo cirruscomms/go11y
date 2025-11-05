@@ -94,7 +94,7 @@ func TestRoundtripStorer(t *testing.T) {
 		}
 	}()
 
-	t.Setenv("DB_CONSTR", ctr.DatabaseURL())
+	t.Setenv("DATABASE_URL", ctr.DatabaseURL())
 
 	cfg, err := go11y.LoadConfig()
 	if err != nil {

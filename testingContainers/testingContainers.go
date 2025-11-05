@@ -117,7 +117,7 @@ func Postgres(t *testing.T, ctx context.Context) (ctr *postgres.PostgresContaine
 		return nil, err
 	}
 
-	t.Setenv("DB_CONSTR", dConStr)
+	t.Setenv("DATABASE_URL", dConStr)
 
 	return c, nil
 }

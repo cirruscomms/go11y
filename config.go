@@ -37,7 +37,7 @@ type Configuration struct {
 type interimConfig struct {
 	StrLevel    string `env:"LOG_LEVEL" envDefault:"debug"`
 	OtelURL     string `env:"OTEL_URL" envDefault:""`
-	DatabaseURL string `env:"DB_CONSTR" envDefault:""`
+	DatabaseURL string `env:"DATABASE_URL" envDefault:""`
 	ServiceName string `env:"OTEL_SERVICE_NAME" envDefault:""`
 	TrimModules string `env:"TRIM_MODULES" envDefault:""`
 	TrimPaths   string `env:"TRIM_PATHS" envDefault:""`

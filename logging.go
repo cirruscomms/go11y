@@ -59,7 +59,12 @@ func (o *Observer) Warning(msg string, ephemeralArgs ...any) {
 
 // Warn is an alias for Warning to maintain backward compatibility.
 func (o *Observer) Warn(msg string, ephemeralArgs ...any) {
-	o.Warning(msg, ephemeralArgs...)
+	logged := o.log(context.Background(), 3, LevelWarning, msg, ephemeralArgs...)
+	if logged && o.span != nil {
+		attrs := argsToAttributes(append(o.stableArgs, ephemeralArgs)...)
+		o.span.SetAttributes(attrs...)
+		o.span.AddEvent(msg)
+	}
 }
 
 // Error logs an error message, records the error in the span if available, and sets the severity.
