@@ -198,10 +198,6 @@ func GetMetricsMiddlewareMux(ctx context.Context, opts MetricsMiddlewareMuxOpts)
 				path = opts.PathMaskFunc(path)
 			}
 
-			for key, val := range w.Header() {
-				fmt.Println("Header:", key, val)
-			}
-
 			requestTime := time.Since(t0)
 			Requests.WithLabelValues(path, r.Method, fmt.Sprintf("%d", mrw.statusCode)).Inc()
 			RequestTimes.WithLabelValues(path, r.Method, fmt.Sprintf("%d", mrw.statusCode)).Observe(requestTime.Seconds())
