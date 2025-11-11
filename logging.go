@@ -47,7 +47,7 @@ func (o *Observer) Notice(msg string, ephemeralArgs ...any) {
 	}
 }
 
-// Warn logs a warning message and adds an event to the span if available.
+// Warning logs a warning message and adds an event to the span if available.
 func (o *Observer) Warning(msg string, ephemeralArgs ...any) {
 	logged := o.log(context.Background(), 3, LevelWarning, msg, ephemeralArgs...)
 	if logged && o.span != nil {
@@ -57,7 +57,7 @@ func (o *Observer) Warning(msg string, ephemeralArgs ...any) {
 	}
 }
 
-// Warn is an alias for Warning to maintain backward compatibility.
+// Warn a backward compatibility alias for Warning.
 func (o *Observer) Warn(msg string, ephemeralArgs ...any) {
 	logged := o.log(context.Background(), 3, LevelWarning, msg, ephemeralArgs...)
 	if logged && o.span != nil {

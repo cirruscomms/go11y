@@ -31,7 +31,7 @@ func AddPropagationToReverseProxy(reverseProxy *httputil.ReverseProxy) (fault er
 	}
 
 	// Wrap the existing transport with OpenTelemetry tracing
-	reverseProxy.Transport = PropagateRoundTripper(reverseProxy.Transport)
+	reverseProxy.Transport = propagateRoundTripper(reverseProxy.Transport)
 	return nil
 }
 
@@ -45,7 +45,7 @@ func AddLoggingToReverseProxy(reverseProxy *httputil.ReverseProxy) (fault error)
 	}
 
 	// Wrap the existing transport with logging
-	reverseProxy.Transport = LogRoundTripper(reverseProxy.Transport)
+	reverseProxy.Transport = logRoundTripper(reverseProxy.Transport)
 	return nil
 }
 
@@ -59,6 +59,6 @@ func AddDBStoreToReverseProxy(reverseProxy *httputil.ReverseProxy) (fault error)
 	}
 
 	// Wrap the existing transport with logging
-	reverseProxy.Transport = DBStoreRoundTripper(reverseProxy.Transport)
+	reverseProxy.Transport = dbStoreRoundTripper(reverseProxy.Transport)
 	return nil
 }

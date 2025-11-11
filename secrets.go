@@ -45,6 +45,8 @@ func RedactSecret(secretStr string, reveal int) string {
 	}
 }
 
+// RedactHeaders redacts sensitive information from HTTP headers such as Authorization and Cookie.
+// It applies RedactSecret to the values of these headers.
 func RedactHeaders(headers http.Header) http.Header {
 	redactedHeaders := make(http.Header)
 	for key, values := range headers {

@@ -17,17 +17,10 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 )
 
+// Tracer gets a Tracer with the given name and options using the Observer's tracer provider.
 func (o *Observer) Tracer(name string, opts ...otelTrace.TracerOption) otelTrace.Tracer {
 	return o.traceProvider.Tracer(name, opts...)
 }
-
-// func (o *Observer) SpanContext() otelTrace.SpanContext {
-// 	if o.activeSpan == nil {
-// 		return otelTrace.SpanContext{}
-// 	}
-
-// 	return o.activeSpan.SpanContext()
-// }
 
 func tracerProvider(ctx context.Context, cfg Configurator) (tracerProvider *otelSDKTrace.TracerProvider, fault error) {
 	headers := map[string]string{
@@ -124,18 +117,19 @@ func argsToAttributes(combinedArgs ...any) []otelAttribute.KeyValue {
 }
 
 const (
-	SpanKindServer   = otelTrace.SpanKindServer
-	SpanKindClient   = otelTrace.SpanKindClient
-	SpanKindProducer = otelTrace.SpanKindProducer
-	SpanKindConsumer = otelTrace.SpanKindConsumer
-	SpanKindInternal = otelTrace.SpanKindInternal
+	SpanKindInternal = otelTrace.SpanKindInternal // SpanKindInternal is a constant that aliases otelTrace.SpanKindInternal
+	SpanKindServer   = otelTrace.SpanKindServer   // SpanKindServer is a constant that aliases otelTrace.SpanKindServer
+	SpanKindClient   = otelTrace.SpanKindClient   // SpanKindClient is a constant that aliases otelTrace.SpanKindClient
+	SpanKindProducer = otelTrace.SpanKindProducer // SpanKindProducer is a constant that aliases otelTrace.SpanKindProducer
+	SpanKindConsumer = otelTrace.SpanKindConsumer // SpanKindConsumer is a constant that aliases otelTrace.SpanKindConsumer
 )
 
 type (
-	Tracer       otelTrace.Tracer
-	TracerOption otelTrace.TracerOption
+	Tracer       otelTrace.Tracer       // Tracer is an alias for otelTrace.Tracer
+	TracerOption otelTrace.TracerOption // TracerOption is an alias for otelTrace.TracerOption
 )
 
+// NewTracer creates a new Tracer with the given package address and options.
 func NewTracer(packageAddress string, options ...TracerOption) Tracer {
 	otelOpts := make([]otelTrace.TracerOption, len(options))
 	for i, opt := range options {

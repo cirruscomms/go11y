@@ -21,10 +21,11 @@ import (
 type requestIDKey string
 
 const (
-	RequestIDInstance requestIDKey = "requestID"
-	RequestIDHeader   string       = "X-Swoop-RequestID"
+	RequestIDInstance requestIDKey = "requestID"         // RequestIDInstance is a constant for the context key used to store the request ID
+	RequestIDHeader   string       = "X-Swoop-RequestID" // RequestIDHeader is a constant for the HTTP header used to store the request ID
 )
 
+// GetRequestID retrieves the request ID from the context.
 func GetRequestID(ctx context.Context) string {
 	if ctx == nil {
 		return ""
@@ -37,6 +38,8 @@ func GetRequestID(ctx context.Context) string {
 	return ""
 }
 
+// SetRequestIDMiddleware is a middleware that sets a unique request ID for each incoming HTTP request
+// It generates a new UUID for the request ID, sets it in the request context, and adds it to the response headers
 func SetRequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Generate a new request ID
@@ -53,6 +56,7 @@ func SetRequestIDMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// Origin represents the origin details of an HTTP request
 type Origin struct {
 	ClientIP  string `json:"client_ip"`
 	UserAgent string `json:"user_agent"`
@@ -135,11 +139,9 @@ type MetricsMiddlewareMuxOpts struct {
 	validRouter  routers.Router // the validated router created from the swagger spec
 }
 
+// PathMask is a function that takes a path string and returns a masked path string
+// This can be used to remove variable parts of the path for metrics aggregation
 type PathMask func(path string) (maskedPath string)
-
-func NoopPathMask(path string) (maskedPath string) {
-	return path
-}
 
 // GetMetricsMiddlewareMux initialises a promhttp metrics route on the provided mux router with a path of
 // /internal/metrics and returns a mux middleware that records request-count and request-time Prometheus metrics for
@@ -207,12 +209,14 @@ func GetMetricsMiddlewareMux(ctx context.Context, opts MetricsMiddlewareMuxOpts)
 	return mw, nil
 }
 
+// MiddlewareResponseWriter is a custom http.ResponseWriter that captures the status code of the response.
 type MiddlewareResponseWriter struct {
 	http.ResponseWriter
 	statusCode    int
 	headerWritten bool
 }
 
+// WriteHeader sends an HTTP response header with the provided status code.
 func (mrw *MiddlewareResponseWriter) WriteHeader(code int) {
 	if !mrw.headerWritten {
 		mrw.statusCode = code
@@ -221,6 +225,9 @@ func (mrw *MiddlewareResponseWriter) WriteHeader(code int) {
 	}
 }
 
+// Write writes the data to the connection as part of an HTTP reply. If WriteHeader has not yet been called, Write calls
+// WriteHeader(http.StatusOK) before writing the data. Thus, explicit calls to WriteHeader are mainly used to send error
+// codes.
 func (mrw *MiddlewareResponseWriter) Write(b []byte) (int, error) {
 	if !mrw.headerWritten {
 		mrw.WriteHeader(http.StatusOK)

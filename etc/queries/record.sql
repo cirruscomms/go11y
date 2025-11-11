@@ -19,7 +19,7 @@ INSERT INTO remote_api_requests (
     @status_code
 );
 
--- name: GetAPIRequests :one
+-- name: GetAPIRequest :one
 SELECT *
 FROM remote_api_requests
 ORDER BY created_at DESC

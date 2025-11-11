@@ -11,8 +11,10 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
+// RoundTripperFunc type is an adapter to allow the use of ordinary functions as http.RoundTripper
 type RoundTripperFunc func(*http.Request) (*http.Response, error)
 
+// RoundTrip calls the RoundTripperFunc with the given request for each RoundTripper
 func (rt RoundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 	if rt == nil {
 		return http.DefaultTransport.RoundTrip(r)
@@ -20,7 +22,7 @@ func (rt RoundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 	return rt(r)
 }
 
-func LogRoundTripper(next http.RoundTripper) http.RoundTripper {
+func logRoundTripper(next http.RoundTripper) http.RoundTripper {
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
 		ctx, o := Get(r.Context())
 
@@ -82,7 +84,7 @@ func LogRoundTripper(next http.RoundTripper) http.RoundTripper {
 	})
 }
 
-func DBStoreRoundTripper(next http.RoundTripper) http.RoundTripper {
+func dbStoreRoundTripper(next http.RoundTripper) http.RoundTripper {
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
 		ctx, o := Get(r.Context())
 		reqBody := []byte{}
@@ -131,7 +133,7 @@ func DBStoreRoundTripper(next http.RoundTripper) http.RoundTripper {
 	})
 }
 
-func PropagateRoundTripper(next http.RoundTripper) http.RoundTripper {
+func propagateRoundTripper(next http.RoundTripper) http.RoundTripper {
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
 		ctx := r.Context()
 
@@ -141,7 +143,7 @@ func PropagateRoundTripper(next http.RoundTripper) http.RoundTripper {
 	})
 }
 
-func MetricsRoundTripper(next http.RoundTripper, recorder MetricsRecorder, pathMaskFunc PathMask) http.RoundTripper {
+func metricsRoundTripper(next http.RoundTripper, recorder MetricsRecorder, pathMaskFunc PathMask) http.RoundTripper {
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
 		t0 := time.Now()
 

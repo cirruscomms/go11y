@@ -77,8 +77,8 @@ func LoadConfig() (cfg *Configuration, fault error) {
 
 // CreateConfig creates a new Configuration instance populated with the provided parameters.
 // This is intended to be used for when you want to create a config without loading from environment variables.
-// The Configuration returned satisfies the Configurator interface, allowing it to be used interchangeably with configurations
-// loaded from environment variables.
+// The Configuration returned satisfies the Configurator interface, allowing it to be used interchangeably with
+// configurations loaded from environment variables.
 func CreateConfig(logLevel slog.Level, otelURL, dbConStr, serviceName string, trimModules, trimPaths []string) *Configuration {
 	return &Configuration{
 		logLevel:    logLevel,
@@ -103,7 +103,7 @@ func (c *Configuration) OtelURL() string {
 	return c.otelURL
 }
 
-// DBConStr returns the database connection string.
+// DatabaseURL returns the database connection string.
 // This method is part of the Configurator interface.
 func (c *Configuration) DatabaseURL() string {
 	return c.databaseURL

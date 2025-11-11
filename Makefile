@@ -13,12 +13,3 @@ coverage:
 	@go tool cover -html=coverage.out -o coverage.html
 	@rm coverage.out
 
-simple-demo:
-	cd demo; ENV=demo go run . -simple
-
-
-server-demo:
-	cd demo; ENV=demo go run . -server
-
-client-demo:
-	cd demo; ENV=demo go run .

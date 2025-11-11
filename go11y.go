@@ -24,8 +24,10 @@ import (
 	otelTrace "go.opentelemetry.io/otel/trace"
 )
 
+// Fields represents a set of key-value pairs for logging.
 type Fields map[string]any
 
+// Observer is the main struct for observability, containing loggers, tracer providers, and database connections.
 type Observer struct {
 	cfg           Configurator
 	output        io.Writer
@@ -41,6 +43,7 @@ type Observer struct {
 	skipCallers   int
 }
 
+// ObserverDB holds the database connection and queries for the Observer.
 type ObserverDB struct {
 	conn    *pgx.Conn
 	pool    *pgxpool.Pool
@@ -53,7 +56,17 @@ var obsKeyInstance go11yContextKey = "cirruscomms/go11y"
 
 var og *Observer
 
-func Initialise(ctx context.Context, cfg Configurator, logOutput, errOutput io.Writer, initialArgs ...any) (ctxWithGo11y context.Context, observer *Observer, fault error) {
+// Initialise sets up the Observer with the provided configuration, log outputs, and initial arguments.
+func Initialise(
+	ctx context.Context,
+	cfg Configurator,
+	logOutput, errOutput io.Writer,
+	initialArgs ...any,
+) (
+	ctxWithGo11y context.Context,
+	observer *Observer,
+	fault error,
+) {
 	if logOutput == nil {
 		logOutput = os.Stdout
 	}
@@ -146,6 +159,7 @@ func Initialise(ctx context.Context, cfg Configurator, logOutput, errOutput io.W
 	return ctx, og, nil
 }
 
+// Reset resets the Observer in the context to its initial state.
 func Reset(ctxWithGo11y context.Context) (ctxWithResetObservability context.Context) {
 	og.outLogger = slog.New(slog.NewJSONHandler(og.output, defaultOptions(og.cfg)))
 	og.errLogger = slog.New(slog.NewJSONHandler(og.output, defaultOptions(og.cfg)))
@@ -184,7 +198,15 @@ func Extend(ctx context.Context, newArgs ...any) (ctxWithGo11y context.Context, 
 // Span gets the Observer from the context and starts a new tracing span with the given name.
 // If no Observer exists in the context, it initializes a new one with default settings and starts the span.
 // The tracing equivalent of Get()
-func Span(ctx context.Context, tracer otelTrace.Tracer, spanName string, spanKind otelTrace.SpanKind) (ctxWithSpan context.Context, observer *Observer) {
+func Span(
+	ctx context.Context,
+	tracer otelTrace.Tracer,
+	spanName string,
+	spanKind otelTrace.SpanKind,
+) (
+	ctxWithSpan context.Context,
+	observer *Observer,
+) {
 	ctx, o := Get(ctx)
 
 	ctx, span := tracer.Start(ctx, spanName, otelTrace.WithSpanKind(spanKind))
@@ -195,9 +217,19 @@ func Span(ctx context.Context, tracer otelTrace.Tracer, spanName string, spanKin
 	return context.WithValue(ctx, obsKeyInstance, o), o
 }
 
-// Expand retrieves the Observer from the context, starts a new tracing span with the given name, and adds new arguments to its logger.
-// If no Observer exists in the context, it initializes a new one with default settings and adds the arguments.
-func Expand(ctx context.Context, tracer otelTrace.Tracer, spanName string, spanKind otelTrace.SpanKind, newArgs ...any) (ctxWithSpan context.Context, observer *Observer) {
+// Expand retrieves the Observer from the context, starts a new tracing span with the given name, and adds new arguments
+// to its logger. If no Observer exists in the context, it initializes a new one with default settings and adds the
+// arguments.
+func Expand(
+	ctx context.Context,
+	tracer otelTrace.Tracer,
+	spanName string,
+	spanKind otelTrace.SpanKind,
+	newArgs ...any,
+) (
+	ctxWithSpan context.Context,
+	observer *Observer,
+) {
 	ctx, o := Span(ctx, tracer, spanName, spanKind)
 
 	if len(newArgs) != 0 {
@@ -379,12 +411,13 @@ func (o *Observer) store(ctx context.Context, url, method string, statusCode int
 	return nil
 }
 
+// CheckStore retrieves the most recent RemoteApiRequest from the database for verification purposes.
 func (o *Observer) CheckStore() (record db.RemoteApiRequest, fault error) {
 	if o.db == nil {
 		return db.RemoteApiRequest{}, nil
 	}
 
-	record, err := o.db.queries.GetAPIRequests(context.Background())
+	record, err := o.db.queries.GetAPIRequest(context.Background())
 	if err != nil {
 		return db.RemoteApiRequest{}, fmt.Errorf("failed to get last remote API request: %w", err)
 	}
@@ -420,9 +453,7 @@ func processArgs(exArgs map[any]any, args []any) (map[any]any, []any) {
 	return exArgs, args[2:]
 }
 
-func (o *Observer) Mute(ctx context.Context) {
-}
-
+// End ends the current tracing span and reverts to the previous span in the stack.
 func (o *Observer) End() {
 	o.span.End()
 
@@ -441,6 +472,8 @@ func InContext(ctx context.Context) (response bool) {
 	return (ctx.Value(obsKeyInstance) != nil)
 }
 
+// IncreaseDistance increases the caller skip distance for logging purposes.
+// This is useful when wrapping go11y (such as the go-common splitLog)
 func (o *Observer) IncreaseDistance(distance int) {
 	o.skipCallers += distance
 }

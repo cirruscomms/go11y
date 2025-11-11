@@ -8,7 +8,7 @@ import (
 	"github.com/cirruscomms/go11y"
 	"github.com/cirruscomms/go11y/db"
 	"github.com/cirruscomms/go11y/etc/migrations"
-	"github.com/cirruscomms/go11y/testingContainers"
+	testingContainers "github.com/cirruscomms/go11y/tests/containers"
 )
 
 func TestFileSystem(t *testing.T) {
