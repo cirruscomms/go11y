@@ -3,6 +3,7 @@ package go11y
 import (
 	"errors"
 	"net/http"
+	"time"
 
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
@@ -68,6 +69,23 @@ func AddDBStoreToHTTPClient(httpClient *http.Client) (fault error) {
 
 	// Wrap the existing transport with logging
 	httpClient.Transport = DBStoreRoundTripper(httpClient.Transport)
+
+	return nil
+}
+
+type MetricsRecorder func(statusCode int, method, path string, startTime time.Time)
+
+func AddMetricsToHTTPClient(httpClient *http.Client, recorder MetricsRecorder) (fault error) {
+	if httpClient == nil {
+		return errors.New("httpClient cannot be nil")
+	}
+
+	if recorder == nil {
+		return errors.New("recorder cannot be nil")
+	}
+
+	// Wrap the existing transport with metrics recording
+	httpClient.Transport = MetricsRoundTripper(httpClient.Transport, recorder)
 
 	return nil
 }

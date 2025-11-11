@@ -140,3 +140,15 @@ func PropagateRoundTripper(next http.RoundTripper) http.RoundTripper {
 		return next.RoundTrip(r)
 	})
 }
+
+func MetricsRoundTripper(next http.RoundTripper, recorder MetricsRecorder) http.RoundTripper {
+	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
+		t0 := time.Now()
+
+		resp, err := next.RoundTrip(r)
+
+		recorder(resp.StatusCode, r.Method, r.URL.Path, t0)
+
+		return resp, err
+	})
+}

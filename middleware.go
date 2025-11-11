@@ -2,9 +2,17 @@ package go11y
 
 import (
 	"context"
+	"fmt"
 	"net/http"
+	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
+	"github.com/getkin/kin-openapi/routers"
+	oapimux "github.com/getkin/kin-openapi/routers/gorillamux"
 	"github.com/google/uuid"
+	"github.com/gorilla/mux"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
@@ -29,7 +37,7 @@ func GetRequestID(ctx context.Context) string {
 	return ""
 }
 
-func SetRequestID(next http.Handler) http.Handler {
+func SetRequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Generate a new request ID
 		requestID := uuid.New().String()
@@ -52,10 +60,10 @@ type Origin struct {
 	Path      string `json:"path"`
 }
 
-// LogRequest is a middleware that logs incoming HTTP requests and their details
+// RequestLoggerMiddleware is a middleware that logs incoming HTTP requests and their details
 // It extracts tracing information from the request headers and starts a new span for the request
 // It also logs the request details using go11y, adding the go11y Observer to the request context in the process
-func LogRequest(next http.Handler) http.Handler {
+func RequestLoggerMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Log&Trace the request
 		prop := otel.GetTextMapPropagator()
@@ -110,4 +118,93 @@ func LogRequest(next http.Handler) http.Handler {
 			span.End()
 		}
 	})
+}
+
+var (
+	Requests     *prometheus.CounterVec   // the number of requests the calling service has handled
+	RequestTimes *prometheus.HistogramVec // the amount of time the calling service has taken to handle requests
+	RuntimeOpts  MetricsMiddlewareMuxOpts // the options used to initialise the metrics middleware
+)
+
+// MetricsMiddlewareMuxOpts are the options used to initialise the metrics middleware for a mux.Router
+type MetricsMiddlewareMuxOpts struct {
+	Service      string         // required - the name of the service being instrumented
+	Router       *mux.Router    // required - the router for the service being instrumented. This is used to register the /internal/metrics endpoint.
+	PathMaskFunc PathMask       // required - function to remove variable parts of the path for metrics aggregation. If nil, the path for metrics will not me masked
+	Swagger      *openapi3.T    // optional - the swagger spec for the service being instrumented. This is used to get the endpoint names. If nil, the raw request paths are used.
+	validRouter  routers.Router // the validated router created from the swagger spec
+}
+
+type PathMask func(path string) (maskedPath string)
+
+func NoopPathMask(path string) (maskedPath string) {
+	return path
+}
+
+// GetMetricsMiddlewareMux initialises a promhttp metrics route on the provided mux router with a path of
+// /internal/metrics and returns a mux middleware that records request-count and request-time Prometheus metrics for
+// incoming HTTP requests and publishes the values on the endpoint/route.
+func GetMetricsMiddlewareMux(ctx context.Context, opts MetricsMiddlewareMuxOpts) (metricsMiddleware mux.MiddlewareFunc, fault error) {
+	_, o := Get(ctx)
+
+	Requests = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: fmt.Sprintf("%s_requests_total", opts.Service),
+		Help: fmt.Sprintf("Number of requests the %s service has handled", opts.Service),
+	}, []string{"endpoint", "method", "status"})
+
+	RequestTimes = prometheus.NewHistogramVec(prometheus.HistogramOpts{
+		Name: fmt.Sprintf("%s_requests_times", opts.Service),
+		Help: fmt.Sprintf("Time %s service takes to handle requests", opts.Service),
+	}, []string{"endpoint", "method", "status"})
+
+	// Register the metrics on Prometheus endpoint
+	prometheus.MustRegister(Requests)
+	prometheus.MustRegister(RequestTimes)
+
+	opts.Router.Handle("/internal/metrics", promhttp.Handler()).Methods(http.MethodGet)
+
+	if opts.Swagger != nil {
+		vr, err := oapimux.NewRouter(opts.Swagger)
+		if err != nil {
+			o.Error("error creating oapi validation router: %+v", err, SeverityHigh)
+			return nil, fmt.Errorf("could not create oapi validation router: %w", err)
+		}
+
+		opts.validRouter = vr
+	}
+
+	mw := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			t0 := time.Now()
+
+			// Call the next handler
+			next.ServeHTTP(w, r)
+
+			statusCode := 200
+
+			path := r.URL.Path
+
+			if opts.Swagger != nil {
+				route, _, err := opts.validRouter.FindRoute(r)
+				if err == nil && route != nil {
+					if route.Operation != nil {
+						path = route.Operation.OperationID
+					} else {
+						path = route.Path
+					}
+				}
+			}
+
+			if opts.PathMaskFunc != nil {
+				path = opts.PathMaskFunc(path)
+			}
+
+			fmt.Printf("\n[Metrics] %s %s %d\n\n", r.Method, path, statusCode)
+			requestTime := time.Since(t0)
+			Requests.WithLabelValues(path, r.Method, fmt.Sprintf("%d", statusCode)).Inc()
+			RequestTimes.WithLabelValues(path, r.Method, fmt.Sprintf("%d", statusCode)).Observe(requestTime.Seconds())
+		})
+	}
+
+	return mw, nil
 }
