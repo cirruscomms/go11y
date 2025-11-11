@@ -199,7 +199,6 @@ func GetMetricsMiddlewareMux(ctx context.Context, opts MetricsMiddlewareMuxOpts)
 				path = opts.PathMaskFunc(path)
 			}
 
-			fmt.Printf("\n[Metrics] %s %s %d\n\n", r.Method, path, statusCode)
 			requestTime := time.Since(t0)
 			Requests.WithLabelValues(path, r.Method, fmt.Sprintf("%d", statusCode)).Inc()
 			RequestTimes.WithLabelValues(path, r.Method, fmt.Sprintf("%d", statusCode)).Observe(requestTime.Seconds())
