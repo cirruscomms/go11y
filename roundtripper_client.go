@@ -75,7 +75,7 @@ func AddDBStoreToHTTPClient(httpClient *http.Client) (fault error) {
 
 type MetricsRecorder func(statusCode int, method, path string, startTime time.Time)
 
-func AddMetricsToHTTPClient(httpClient *http.Client, recorder MetricsRecorder) (fault error) {
+func AddMetricsToHTTPClient(httpClient *http.Client, recorder MetricsRecorder, pathMaskFunc PathMask) (fault error) {
 	if httpClient == nil {
 		return errors.New("httpClient cannot be nil")
 	}
@@ -85,7 +85,7 @@ func AddMetricsToHTTPClient(httpClient *http.Client, recorder MetricsRecorder) (
 	}
 
 	// Wrap the existing transport with metrics recording
-	httpClient.Transport = MetricsRoundTripper(httpClient.Transport, recorder)
+	httpClient.Transport = MetricsRoundTripper(httpClient.Transport, recorder, pathMaskFunc)
 
 	return nil
 }

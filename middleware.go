@@ -177,10 +177,9 @@ func GetMetricsMiddlewareMux(ctx context.Context, opts MetricsMiddlewareMuxOpts)
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			t0 := time.Now()
 
+			mrw := newMiddlewareResponseWriter(w)
 			// Call the next handler
-			next.ServeHTTP(w, r)
-
-			statusCode := 200
+			next.ServeHTTP(mrw, r)
 
 			path := r.URL.Path
 
@@ -199,11 +198,40 @@ func GetMetricsMiddlewareMux(ctx context.Context, opts MetricsMiddlewareMuxOpts)
 				path = opts.PathMaskFunc(path)
 			}
 
+			for key, val := range w.Header() {
+				fmt.Println("Header:", key, val)
+			}
+
 			requestTime := time.Since(t0)
-			Requests.WithLabelValues(path, r.Method, fmt.Sprintf("%d", statusCode)).Inc()
-			RequestTimes.WithLabelValues(path, r.Method, fmt.Sprintf("%d", statusCode)).Observe(requestTime.Seconds())
+			Requests.WithLabelValues(path, r.Method, fmt.Sprintf("%d", mrw.statusCode)).Inc()
+			RequestTimes.WithLabelValues(path, r.Method, fmt.Sprintf("%d", mrw.statusCode)).Observe(requestTime.Seconds())
 		})
 	}
 
 	return mw, nil
+}
+
+type MiddlewareResponseWriter struct {
+	http.ResponseWriter
+	statusCode    int
+	headerWritten bool
+}
+
+func (mrw *MiddlewareResponseWriter) WriteHeader(code int) {
+	if !mrw.headerWritten {
+		mrw.statusCode = code
+		mrw.ResponseWriter.WriteHeader(code)
+		mrw.headerWritten = true
+	}
+}
+
+func (mrw *MiddlewareResponseWriter) Write(b []byte) (int, error) {
+	if !mrw.headerWritten {
+		mrw.WriteHeader(http.StatusOK)
+	}
+	return mrw.ResponseWriter.Write(b)
+}
+
+func newMiddlewareResponseWriter(w http.ResponseWriter) *MiddlewareResponseWriter {
+	return &MiddlewareResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
 }
