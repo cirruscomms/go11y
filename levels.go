@@ -5,15 +5,26 @@ import (
 	"strings"
 )
 
-const (
-	LevelDevelop = slog.Level(-8) // Custom level for development only logging, will be disabled in staging and production
-	LevelDebug   = slog.Level(-4) // LevelDebug represents debug-level logging
-	LevelInfo    = slog.Level(0)  // LevelInfo represents informational-level logging
-	LevelNotice  = slog.Level(2)  // LevelNotice represents notice-level logging
-	LevelWarning = slog.Level(4)  // LevelWarning represents warning-level logging
-	LevelError   = slog.Level(8)  // LevelError represents error-level logging
-	LevelFatal   = slog.Level(12) // LevelFatal represents fatal-level logging
-)
+// Custom level for development only logging, will be disabled in staging and production
+const LevelDevelop = slog.Level(-8)
+
+// LevelDebug represents debug-level logging
+const LevelDebug = slog.Level(-4)
+
+// LevelInfo represents informational-level logging
+const LevelInfo = slog.Level(0)
+
+// LevelNotice represents notice-level logging
+const LevelNotice = slog.Level(2)
+
+// LevelWarning represents warning-level logging
+const LevelWarning = slog.Level(4)
+
+// LevelError represents error-level logging
+const LevelError = slog.Level(8)
+
+// LevelFatal represents fatal-level logging
+const LevelFatal = slog.Level(12)
 
 // StringToLevel maps a string representation of a log level to its corresponding slog.Level.
 func StringToLevel(level string) slog.Level {

@@ -116,13 +116,20 @@ func argsToAttributes(combinedArgs ...any) []otelAttribute.KeyValue {
 	return attrs
 }
 
-const (
-	SpanKindInternal = otelTrace.SpanKindInternal // SpanKindInternal is a constant that aliases otelTrace.SpanKindInternal
-	SpanKindServer   = otelTrace.SpanKindServer   // SpanKindServer is a constant that aliases otelTrace.SpanKindServer
-	SpanKindClient   = otelTrace.SpanKindClient   // SpanKindClient is a constant that aliases otelTrace.SpanKindClient
-	SpanKindProducer = otelTrace.SpanKindProducer // SpanKindProducer is a constant that aliases otelTrace.SpanKindProducer
-	SpanKindConsumer = otelTrace.SpanKindConsumer // SpanKindConsumer is a constant that aliases otelTrace.SpanKindConsumer
-)
+// SpanKindInternal is a constant that aliases otelTrace.SpanKindInternal
+const SpanKindInternal = otelTrace.SpanKindInternal
+
+// SpanKindServer is a constant that aliases otelTrace.SpanKindServer
+const SpanKindServer = otelTrace.SpanKindServer
+
+// SpanKindClient is a constant that aliases otelTrace.SpanKindClient
+const SpanKindClient = otelTrace.SpanKindClient
+
+// SpanKindProducer is a constant that aliases otelTrace.SpanKindProducer
+const SpanKindProducer = otelTrace.SpanKindProducer
+
+// SpanKindConsumer is a constant that aliases otelTrace.SpanKindConsumer
+const SpanKindConsumer = otelTrace.SpanKindConsumer
 
 type (
 	Tracer       otelTrace.Tracer       // Tracer is an alias for otelTrace.Tracer

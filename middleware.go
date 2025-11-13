@@ -20,10 +20,11 @@ import (
 
 type requestIDKey string
 
-const (
-	RequestIDInstance requestIDKey = "requestID"         // RequestIDInstance is a constant for the context key used to store the request ID
-	RequestIDHeader   string       = "X-Swoop-RequestID" // RequestIDHeader is a constant for the HTTP header used to store the request ID
-)
+// RequestIDInstance is a constant for the context key used to store the request ID
+const RequestIDInstance requestIDKey = "requestID"
+
+// RequestIDHeader is a constant for the HTTP header used to store the request ID
+const RequestIDHeader string = "X-Swoop-RequestID"
 
 // GetRequestID retrieves the request ID from the context.
 func GetRequestID(ctx context.Context) string {
@@ -124,11 +125,14 @@ func RequestLoggerMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-var (
-	Requests     *prometheus.CounterVec   // the number of requests the calling service has handled
-	RequestTimes *prometheus.HistogramVec // the amount of time the calling service has taken to handle requests
-	RuntimeOpts  MetricsMiddlewareMuxOpts // the options used to initialise the metrics middleware
-)
+// RequestTimes is the metric for the number of requests the calling service has handled
+var Requests *prometheus.CounterVec
+
+// RequestTimes is the metric for the amount of time the calling service has taken to handle requests
+var RequestTimes *prometheus.HistogramVec
+
+// RuntimeOpts are the options used to initialise the metrics middleware
+var RuntimeOpts MetricsMiddlewareMuxOpts
 
 // MetricsMiddlewareMuxOpts are the options used to initialise the metrics middleware for a mux.Router
 type MetricsMiddlewareMuxOpts struct {
