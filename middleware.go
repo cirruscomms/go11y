@@ -125,7 +125,7 @@ func RequestLoggerMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-// RequestTimes is the metric for the number of requests the calling service has handled
+// Requests is the metric for the number of requests the calling service has handled
 var Requests *prometheus.CounterVec
 
 // RequestTimes is the metric for the amount of time the calling service has taken to handle requests

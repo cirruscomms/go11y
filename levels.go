@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// Custom level for development only logging, will be disabled in staging and production
+// LevelDevelop is a custom level for development only logging, will be disabled in staging and production
 const LevelDevelop = slog.Level(-8)
 
 // LevelDebug represents debug-level logging

@@ -2,6 +2,7 @@ package go11y
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -84,9 +85,9 @@ func logRoundTripper(next http.RoundTripper) http.RoundTripper {
 	})
 }
 
-func dbStoreRoundTripper(next http.RoundTripper) http.RoundTripper {
+func dbStoreRoundTripper(ctxWithObserver context.Context, next http.RoundTripper) http.RoundTripper {
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
-		ctx, o := Get(r.Context())
+		ctx, o := Get(ctxWithObserver)
 		reqBody := []byte{}
 		if r.Body != nil {
 			defer func() {

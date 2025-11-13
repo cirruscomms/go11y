@@ -14,12 +14,14 @@ import (
 	"github.com/testcontainers/testcontainers-go"
 )
 
-func TestRoundtripLogger(t *testing.T) {
-	client := &http.Client{
-		Transport: http.DefaultTransport,
+func TestLoggingTransport(t *testing.T) {
+	client := &go11y.HTTPClient{
+		&http.Client{
+			Transport: http.DefaultTransport,
+		},
 	}
 
-	err := go11y.AddLoggingToHTTPClient(client)
+	err := client.AddLogging()
 	if err != nil {
 		t.Fatalf("failed to add logging to HTTP client: %v", err)
 	}
@@ -77,7 +79,7 @@ func TestRoundtripLogger(t *testing.T) {
 	}
 }
 
-func TestRoundtripStorer(t *testing.T) {
+func TestStoringTransport(t *testing.T) {
 	t.Setenv("ENV", "test")
 	t.Setenv("LOG_LEVEL", "develop")
 
@@ -101,7 +103,7 @@ func TestRoundtripStorer(t *testing.T) {
 		t.Fatalf("failed to load config: %v", err)
 	}
 
-	_, o, err := go11y.Initialise(ctx, cfg, nil, nil)
+	ctx, o, err := go11y.Initialise(ctx, cfg, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to initialise observer: %v", err)
 	}
@@ -109,11 +111,13 @@ func TestRoundtripStorer(t *testing.T) {
 		o.Close()
 	}()
 
-	client := &http.Client{
-		Transport: http.DefaultTransport,
+	client := &go11y.HTTPClient{
+		&http.Client{
+			Transport: http.DefaultTransport,
+		},
 	}
 
-	err = go11y.AddDBStoreToHTTPClient(client)
+	err = client.AddDBStore(ctx)
 	if err != nil {
 		t.Fatalf("failed to add logging to HTTP client: %v", err)
 	}
@@ -142,7 +146,7 @@ func TestRoundtripStorer(t *testing.T) {
 	}
 }
 
-func TestRoundtripperPropagator(t *testing.T) {
+func TestPropagatingTransport(t *testing.T) {
 	t.Skipf("Skipping test as it is flaky in CI/CD pipelines")
 
 	t.Setenv("ENV", "test")
@@ -176,11 +180,13 @@ func TestRoundtripperPropagator(t *testing.T) {
 		o.Close()
 	}()
 
-	client := &http.Client{
-		Transport: http.DefaultTransport,
+	client := &go11y.HTTPClient{
+		&http.Client{
+			Transport: http.DefaultTransport,
+		},
 	}
 
-	err = go11y.AddPropagationToHTTPClient(client)
+	err = client.AddPropagation()
 	if err != nil {
 		t.Fatalf("failed to add tracing to HTTP client: %v", err)
 	}

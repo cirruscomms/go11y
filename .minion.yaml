@@ -1,0 +1,19 @@
+branches:
+    production: main
+    staging: staging
+    testing: testing
+name: go11y
+slug: go11y
+project-type: backend package
+force-jira-id: false
+documentation-directory: docs
+open-api-specification: []
+sqlc-definition:
+    - etc/sqlc.yaml
+jira_components:
+    CP: go11y
+    MOB: go11y
+    PROV: go11y
+    SD: go11y
+    SWPP: go11y
+    WEBS: go11y
