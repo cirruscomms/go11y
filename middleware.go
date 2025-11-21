@@ -65,64 +65,73 @@ type Origin struct {
 	Path      string `json:"path"`
 }
 
-// RequestLoggerMiddleware is a middleware that logs incoming HTTP requests and their details
+// RequestLoggerMiddlewareMux is a middleware that logs incoming HTTP requests and their details
 // It extracts tracing information from the request headers and starts a new span for the request
 // It also logs the request details using go11y, adding the go11y Observer to the request context in the process
-func RequestLoggerMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Log&Trace the request
-		prop := otel.GetTextMapPropagator()
+func RequestLoggerMiddlewareMux(ctxWithObserver context.Context, next http.Handler) (metricsMiddleware mux.MiddlewareFunc, fault error) {
+	_, o, err := Get(ctxWithObserver)
+	if err != nil {
+		return nil, fmt.Errorf("could not get go11y observer from context: %w", err)
+	}
 
-		ctx := prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+	mw := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Log&Trace the request
+			prop := otel.GetTextMapPropagator()
 
-		requestID := GetRequestID(ctx)
+			ctx := prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 
-		ctx = Reset(ctx)
+			requestID := GetRequestID(ctx)
 
-		args := []any{
-			"origin",
-			Origin{
-				ClientIP:  r.RemoteAddr,
-				UserAgent: r.UserAgent(),
-				Method:    r.Method,
-				Path:      r.URL.Path,
-			},
-			FieldRequestID, requestID,
-		}
+			ctx = Reset(ctx)
 
-		var span trace.Span
-
-		if og.cfg.OtelURL() != "" {
-			tracer := otel.Tracer(requestID)
-
-			// tracer
-			opts := []trace.SpanStartOption{
-				trace.WithSpanKind(trace.SpanKindServer),
-				trace.WithAttributes(argsToAttributes(args...)...),
+			args := []any{
+				"origin",
+				Origin{
+					ClientIP:  r.RemoteAddr,
+					UserAgent: r.UserAgent(),
+					Method:    r.Method,
+					Path:      r.URL.Path,
+				},
+				FieldRequestID, requestID,
 			}
-			_, span = tracer.Start(ctx, "HTTP "+r.Method+" "+r.URL.Path, opts...)
 
-			args = append(args,
-				FieldSpanID, span.SpanContext().SpanID(),
-				FieldTraceID, span.SpanContext().TraceID(),
-			)
-		}
+			var span trace.Span
 
-		ctx, o := Extend(ctx, args...)
-		o.Debug("request received")
+			if o.cfg.OtelURL() != "" {
+				tracer := otel.Tracer(requestID)
 
-		r = r.WithContext(ctx)
+				// tracer
+				opts := []trace.SpanStartOption{
+					trace.WithSpanKind(trace.SpanKindServer),
+					trace.WithAttributes(argsToAttributes(args...)...),
+				}
+				_, span = tracer.Start(ctx, "HTTP "+r.Method+" "+r.URL.Path, opts...)
 
-		// Call the next handler
-		next.ServeHTTP(w, r)
+				args = append(args,
+					FieldSpanID, span.SpanContext().SpanID(),
+					FieldTraceID, span.SpanContext().TraceID(),
+				)
+			}
 
-		// Log the response
-		o.Debug("request processed", args...)
+			ctx, o, _ := Extend(ctx, args...)
+			o.Debug("request received")
 
-		if og.cfg.OtelURL() != "" {
-			span.End()
-		}
-	})
+			r = r.WithContext(ctx)
+
+			// Call the next handler
+			next.ServeHTTP(w, r)
+
+			// Log the response
+			o.Debug("request processed", args...)
+
+			if o.cfg.OtelURL() != "" {
+				span.End()
+			}
+		})
+	}
+
+	return mw, nil
 }
 
 // Requests is the metric for the number of requests the calling service has handled
@@ -151,7 +160,10 @@ type PathMask func(path string) (maskedPath string)
 // /internal/metrics and returns a mux middleware that records request-count and request-time Prometheus metrics for
 // incoming HTTP requests and publishes the values on the endpoint/route.
 func GetMetricsMiddlewareMux(ctx context.Context, opts MetricsMiddlewareMuxOpts) (metricsMiddleware mux.MiddlewareFunc, fault error) {
-	_, o := Get(ctx)
+	_, o, err := Get(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("could not get go11y observer from context: %w", err)
+	}
 
 	Requests = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: fmt.Sprintf("%s_requests_total", opts.Service),

@@ -3,6 +3,7 @@ package go11y
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -18,7 +19,7 @@ type HTTPClient struct {
 // AddTracing wraps a http.Client's transporter with OpenTelemetry instrumentation
 // This allows us to capture request and response details in our telemetry data
 // Note: Ensure that the OpenTelemetry SDK and otelhttp package are properly initialized before using this client
-func (c *HTTPClient) AddTracing() (fault error) {
+func (c *HTTPClient) AddTracing(ctxWithObserver context.Context) (fault error) {
 	c.Transport = otelhttp.NewTransport(c.Transport)
 	return nil
 }
@@ -26,7 +27,12 @@ func (c *HTTPClient) AddTracing() (fault error) {
 // AddPropagation wraps a http.Client's transporter with OpenTelemetry propagation
 // This allows us to propagate tracing context across service boundaries
 // Note: Ensure that the OpenTelemetry SDK and propagation package are properly initialized before using this client
-func (c *HTTPClient) AddPropagation() (fault error) {
+func (c *HTTPClient) AddPropagation(ctxWithObserver context.Context) (fault error) {
+	_, _, err := Get(ctxWithObserver)
+	if err != nil {
+		return fmt.Errorf("could not get go11y observer from context: %w", err)
+	}
+
 	c.Transport = propagateRoundTripper(c.Transport)
 	return nil
 }
@@ -34,22 +40,26 @@ func (c *HTTPClient) AddPropagation() (fault error) {
 // AddLogging wraps a http.Client's transporter with logging functionality
 // This allows us to log request and response details for debugging and monitoring purposes
 // Note: Ensure that the logging system is properly initialized before using this client
-func (c *HTTPClient) AddLogging() (fault error) {
-	c.Transport = logRoundTripper(c.Transport)
+func (c *HTTPClient) AddLogging(ctxWithObserver context.Context) (fault error) {
+	_, _, err := Get(ctxWithObserver)
+	if err != nil {
+		return fmt.Errorf("could not get go11y observer from context: %w", err)
+	}
+
+	c.Transport = logRoundTripper(ctxWithObserver, c.Transport)
 	return nil
 }
 
 // AddDBStore wraps a http.Client's transporter with database storage functionality
 // This allows us to store request and response details in a database for auditing and analysis purposes
 // Note: Ensure that the database connection and storage system are properly initialized before using this client
-func (c *HTTPClient) AddDBStore(ctxWithObserver context.Context) (fault error) {
-	_, o := Get(ctxWithObserver)
-
-	if o.db == nil {
-		return errors.New("go11y initialised with out a database - cannot add DBStore transport")
+func (c *HTTPClient) AddDBStore(ctxWithObserver context.Context, dbStorer DBStorer) (fault error) {
+	_, _, err := Get(ctxWithObserver)
+	if err != nil {
+		return fmt.Errorf("could not get go11y observer from context: %w", err)
 	}
 
-	c.Transport = dbStoreRoundTripper(ctxWithObserver, c.Transport)
+	c.Transport = dbStoreRoundTripper(ctxWithObserver, dbStorer, c.Transport)
 
 	return nil
 }

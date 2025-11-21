@@ -17,7 +17,6 @@ import (
 type Configurator interface {
 	LogLevel() slog.Level
 	OtelURL() string
-	DatabaseURL() string
 	ServiceName() string
 	TrimPaths() []string
 	TrimModules() []string
@@ -64,7 +63,6 @@ func LoadConfig() (cfg *Configuration, fault error) {
 
 	c := &Configuration{
 		otelURL:     h.OtelURL,
-		databaseURL: h.DatabaseURL,
 		strLevel:    h.StrLevel,
 		logLevel:    StringToLevel(h.StrLevel),
 		serviceName: h.ServiceName,
@@ -101,12 +99,6 @@ func (c *Configuration) LogLevel() slog.Level {
 // This method is part of the Configurator interface.
 func (c *Configuration) OtelURL() string {
 	return c.otelURL
-}
-
-// DatabaseURL returns the database connection string.
-// This method is part of the Configurator interface.
-func (c *Configuration) DatabaseURL() string {
-	return c.databaseURL
 }
 
 // ServiceName returns the configured service name for OpenTelemetry.

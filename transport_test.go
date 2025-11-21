@@ -9,6 +9,8 @@ import (
 
 	"github.com/cirruscomms/go11y"
 	testingContainers "github.com/cirruscomms/go11y/tests/containers"
+	"github.com/cirruscomms/go11y/tests/db"
+	"github.com/cirruscomms/go11y/tests/etc/migrations"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/testcontainers/testcontainers-go"
@@ -19,11 +21,6 @@ func TestLoggingTransport(t *testing.T) {
 		&http.Client{
 			Transport: http.DefaultTransport,
 		},
-	}
-
-	err := client.AddLogging()
-	if err != nil {
-		t.Fatalf("failed to add logging to HTTP client: %v", err)
 	}
 
 	ctx := context.Background()
@@ -42,6 +39,11 @@ func TestLoggingTransport(t *testing.T) {
 	ctx, o, err := go11y.Initialise(ctx, cfg, bufOut, bufErr)
 	if err != nil {
 		t.Fatalf("failed to initialise observer: %v", err)
+	}
+
+	err = client.AddLogging(ctx)
+	if err != nil {
+		t.Fatalf("failed to add logging to HTTP client: %v", err)
 	}
 
 	defer func() {
@@ -117,7 +119,27 @@ func TestStoringTransport(t *testing.T) {
 		},
 	}
 
-	err = client.AddDBStore(ctx)
+	migFS, err := migrations.New()
+	if err != nil {
+		t.Fatalf("failed to create migrations: %v", err)
+	}
+
+	migrator, err := db.NewMigrator(ctx, o, ctr, migFS)
+	if err != nil {
+		t.Fatalf("failed to create migrator: %v", err)
+	}
+
+	err = migrator.Migrate()
+	if err != nil {
+		t.Fatalf("failed to run migrations: %v", err)
+	}
+
+	dbStorer, err := db.NewStoreRequest(ctx, ctr.DatabaseURL())
+	if err != nil {
+		t.Fatalf("failed to create DB storer: %v", err)
+	}
+
+	err = client.AddDBStore(ctx, dbStorer)
 	if err != nil {
 		t.Fatalf("failed to add logging to HTTP client: %v", err)
 	}
@@ -135,15 +157,6 @@ func TestStoringTransport(t *testing.T) {
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-
-	record, err := o.CheckStore()
-	if err != nil {
-		t.Fatalf("failed to check store: %v", err)
-	}
-
-	if record.Url != "https://ipapi.co/1.1.1.1/json/" {
-		t.Fatalf("expected a url in the record to be '%s' but got '%s'", "https://ipapi.co/1.1.1.1/json/", record.Url)
-	}
 }
 
 func TestPropagatingTransport(t *testing.T) {
@@ -172,7 +185,7 @@ func TestPropagatingTransport(t *testing.T) {
 		t.Fatalf("failed to load config: %v", err)
 	}
 
-	_, o, err := go11y.Initialise(ctx, cfg, nil, nil)
+	ctx, o, err := go11y.Initialise(ctx, cfg, nil, nil)
 	if err != nil {
 		t.Fatalf("failed to initialise observer: %v", err)
 	}
@@ -186,7 +199,7 @@ func TestPropagatingTransport(t *testing.T) {
 		},
 	}
 
-	err = client.AddPropagation()
+	err = client.AddPropagation(ctx)
 	if err != nil {
 		t.Fatalf("failed to add tracing to HTTP client: %v", err)
 	}

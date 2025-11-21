@@ -4,22 +4,14 @@ package go11y
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
-	"net/http"
 	"os"
 	"runtime"
 	"strings"
 	"time"
 
-	"github.com/cirruscomms/go11y/db"
-	"github.com/cirruscomms/go11y/etc/migrations"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgtype"
-	"github.com/jackc/pgx/v5/pgxpool"
 	otelSDKTrace "go.opentelemetry.io/otel/sdk/trace"
 	otelTrace "go.opentelemetry.io/otel/trace"
 )
@@ -37,24 +29,16 @@ type Observer struct {
 	traceProvider *otelSDKTrace.TracerProvider
 	tracer        otelTrace.Tracer
 	stableArgs    []any
-	db            *ObserverDB
 	span          otelTrace.Span
 	spans         []otelTrace.Span
 	skipCallers   int
-}
-
-// ObserverDB holds the database connection and queries for the Observer.
-type ObserverDB struct {
-	conn    *pgx.Conn
-	pool    *pgxpool.Pool
-	queries *db.Queries
 }
 
 type go11yContextKey string
 
 var obsKeyInstance go11yContextKey = "cirruscomms/go11y"
 
-var og *Observer
+var ogx *Observer
 
 // Initialise sets up the Observer with the provided configuration, log outputs, and initial arguments.
 func Initialise(
@@ -91,7 +75,7 @@ func Initialise(
 
 	opts := defaultOptions(cfg)
 
-	og = &Observer{
+	o := &Observer{
 		cfg:           cfg,
 		output:        logOutput,
 		outLogger:     slog.New(slog.NewJSONHandler(logOutput, opts)),
@@ -101,90 +85,52 @@ func Initialise(
 		skipCallers:   3, // default to 3 but allow it to be increased via o.IncreaseDistance()
 	}
 
-	dbConnStr := cfg.DatabaseURL()
-	if dbConnStr != "" {
-		odb := &ObserverDB{}
-
-		odb.conn, err = pgx.Connect(ctx, dbConnStr)
-		if err != nil {
-			return ctx, nil, fmt.Errorf("could not connect to postgres: %w", err)
-		}
-
-		odb.pool, err = pgxpool.New(ctx, dbConnStr)
-		if err != nil {
-			return ctx, nil, fmt.Errorf("could not create connection pool: %w", err)
-		}
-
-		odb.queries = db.New(odb.conn)
-
-		og.db = odb
-
-		col, err := migrations.New()
-		if err != nil {
-			return ctx, nil, fmt.Errorf("failed to read migrations: %w", err)
-		}
-
-		dbMig, err := db.NewMigrator(ctx, og, cfg, col)
-		if err != nil {
-			return ctx, nil, fmt.Errorf("could not create migrator: %w", err)
-		}
-
-		state, err := dbMig.GetCurrentVersion()
-		if err != nil {
-			return ctx, nil, fmt.Errorf("could not determine the state of the database migrations: %w", err)
-		}
-
-		// Only run the go11y migration if no other migrations have been run so as not to break things for the system
-		// that is importing go11y. If a service already has migrations before it starts using go11y, it will need to
-		// duplicate the migrations etc/db/migrations/*.sql into the service's own migrations sequence, making sure to
-		// set the sequence of the duplicated versions to the next available step.
-		if state == 0 {
-			err = dbMig.Migrate()
-			if err != nil {
-				return ctx, nil, fmt.Errorf("could not migrate database: %w", err)
-			}
-			og.Debug("Database migrated successfully")
-		}
-	}
-
-	ctx = context.WithValue(ctx, obsKeyInstance, og)
+	ctx = context.WithValue(ctx, obsKeyInstance, o)
 	if len(initialArgs) != 0 {
-		ctx, og = Extend(ctx, initialArgs...)
+		ctx, o, _ = Extend(ctx, initialArgs...)
 	}
 
-	slog.SetDefault(og.outLogger)
+	slog.SetDefault(o.outLogger)
 
-	og.Debug("Initialised observer with context")
+	o.Debug("Initialised observer with context")
 
-	return ctx, og, nil
+	return ctx, o, nil
 }
 
 // Reset resets the Observer in the context to its initial state.
 func Reset(ctxWithGo11y context.Context) (ctxWithResetObservability context.Context) {
-	og.outLogger = slog.New(slog.NewJSONHandler(og.output, defaultOptions(og.cfg)))
-	og.errLogger = slog.New(slog.NewJSONHandler(og.output, defaultOptions(og.cfg)))
-	og.Debug("Observer reset")
-	og.stableArgs = []any{}
+	ctxWithGo11y, o, err := Get(ctxWithGo11y)
+	if err != nil {
+		return ctxWithGo11y
+	}
 
-	return context.WithValue(ctxWithGo11y, obsKeyInstance, og)
+	o.outLogger = slog.New(slog.NewJSONHandler(o.output, defaultOptions(o.cfg)))
+	o.errLogger = slog.New(slog.NewJSONHandler(o.output, defaultOptions(o.cfg)))
+	o.Debug("Observer reset")
+	o.stableArgs = []any{}
+
+	return context.WithValue(ctxWithGo11y, obsKeyInstance, o)
 }
 
 // Get retrieves the Observer from the context. If none exists, it initializes a new one with default settings.
-func Get(ctx context.Context) (ctxWithObserver context.Context, observer *Observer) {
+func Get(ctx context.Context) (ctxWithObserver context.Context, observer *Observer, fault error) {
 	ob := ctx.Value(obsKeyInstance)
 	if ob == nil {
-		return context.WithValue(ctx, obsKeyInstance, og), og
+		return ctx, nil, fmt.Errorf("go11y Observer not found in context - please initialise go11y first")
 	}
 
 	o := ob.(*Observer)
 
-	return ctx, o
+	return ctx, o, nil
 }
 
 // Extend retrieves the Observer from the context and adds new arguments to its logger.
 // If no Observer exists in the context, it initializes a new one with default settings and adds the arguments.
-func Extend(ctx context.Context, newArgs ...any) (ctxWithGo11y context.Context, observer *Observer) {
-	ctx, o := Get(ctx)
+func Extend(ctx context.Context, newArgs ...any) (ctxWithGo11y context.Context, observer *Observer, fault error) {
+	ctx, o, err := Get(ctx)
+	if err != nil {
+		return ctx, nil, err
+	}
 
 	if len(newArgs) != 0 {
 		o.outLogger = o.outLogger.With(newArgs...)
@@ -192,7 +138,7 @@ func Extend(ctx context.Context, newArgs ...any) (ctxWithGo11y context.Context, 
 		o.stableArgs = o.AddArgs(newArgs...)
 	}
 
-	return context.WithValue(ctx, obsKeyInstance, o), o
+	return context.WithValue(ctx, obsKeyInstance, o), o, nil
 }
 
 // Span gets the Observer from the context and starts a new tracing span with the given name.
@@ -206,15 +152,19 @@ func Span(
 ) (
 	ctxWithSpan context.Context,
 	observer *Observer,
+	fault error,
 ) {
-	ctx, o := Get(ctx)
+	ctx, o, err := Get(ctx)
+	if err != nil {
+		return ctx, nil, err
+	}
 
 	ctx, span := tracer.Start(ctx, spanName, otelTrace.WithSpanKind(spanKind))
 
 	o.span = span
 	o.spans = append(o.spans, span)
 
-	return context.WithValue(ctx, obsKeyInstance, o), o
+	return context.WithValue(ctx, obsKeyInstance, o), o, nil
 }
 
 // Expand retrieves the Observer from the context, starts a new tracing span with the given name, and adds new arguments
@@ -229,8 +179,12 @@ func Expand(
 ) (
 	ctxWithSpan context.Context,
 	observer *Observer,
+	fault error,
 ) {
-	ctx, o := Span(ctx, tracer, spanName, spanKind)
+	ctx, o, err := Span(ctx, tracer, spanName, spanKind)
+	if err != nil {
+		return ctx, nil, err
+	}
 
 	if len(newArgs) != 0 {
 		o.outLogger = o.outLogger.With(newArgs...)
@@ -238,7 +192,7 @@ func Expand(
 		o.stableArgs = o.AddArgs(newArgs...)
 	}
 
-	return context.WithValue(ctx, obsKeyInstance, o), o
+	return context.WithValue(ctx, obsKeyInstance, o), o, nil
 }
 
 // Close ends all active spans and shuts down the trace provider to ensure all traces are flushed.
@@ -360,69 +314,6 @@ func (o *Observer) error(ctx context.Context, skipCallers int, level slog.Level,
 	_ = o.errLogger.Handler().Handle(ctx, r)
 
 	return true
-}
-
-func (o *Observer) store(ctx context.Context, url, method string, statusCode int32, duration time.Duration, requestBody, responseBody []byte, requestHeaders, responseHeaders http.Header) (fault error) {
-	if o.db == nil {
-		o.Debug("Database is not enabled, skipping storage of API request")
-		return nil
-	}
-
-	reqHead, err := json.Marshal(requestHeaders)
-	if err != nil {
-		o.Error("Failed to marshal request headers to JSON", err, SeverityMedium)
-		return err
-	}
-
-	respHead, err := json.Marshal(responseHeaders)
-	if err != nil {
-		o.Error("Failed to marshal response headers to JSON", err, SeverityMedium)
-		return err
-	}
-
-	rqB := pgtype.Text{
-		String: string(requestBody),
-		Valid:  len(requestBody) > 0,
-	}
-
-	rsB := pgtype.Text{
-		String: string(responseBody),
-		Valid:  len(responseBody) > 0,
-	}
-
-	// Create a new entry in the database
-	entry := db.StoreAPIRequestParams{
-		Url:             url,
-		Method:          method,
-		StatusCode:      statusCode,
-		RequestBody:     rqB,
-		RequestHeaders:  reqHead,
-		ResponseBody:    rsB,
-		ResponseHeaders: respHead,
-		ResponseTimeMs:  int64(duration),
-	}
-
-	// Store the entry in the database
-	if err := o.db.queries.StoreAPIRequest(ctx, entry); err != nil {
-		o.Error("Failed to store entry in database", err, SeverityMedium)
-		return err
-	}
-
-	return nil
-}
-
-// CheckStore retrieves the most recent RemoteApiRequest from the database for verification purposes.
-func (o *Observer) CheckStore() (record db.RemoteApiRequest, fault error) {
-	if o.db == nil {
-		return db.RemoteApiRequest{}, nil
-	}
-
-	record, err := o.db.queries.GetAPIRequest(context.Background())
-	if err != nil {
-		return db.RemoteApiRequest{}, fmt.Errorf("failed to get last remote API request: %w", err)
-	}
-
-	return record, nil
 }
 
 // AddArgs processes the provided arguments, ensuring that they are stable and formatted correctly.

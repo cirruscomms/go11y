@@ -3,11 +3,13 @@ package go11y
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgtype"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/propagation"
 )
@@ -23,10 +25,9 @@ func (rt RoundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 	return rt(r)
 }
 
-func logRoundTripper(next http.RoundTripper) http.RoundTripper {
+func logRoundTripper(ctxWithObserver context.Context, next http.RoundTripper) http.RoundTripper {
+	ctx, o, _ := Get(ctxWithObserver)
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
-		ctx, o := Get(r.Context())
-
 		reqBody := []byte{}
 		if r.Body != nil {
 			defer func() {
@@ -85,9 +86,9 @@ func logRoundTripper(next http.RoundTripper) http.RoundTripper {
 	})
 }
 
-func dbStoreRoundTripper(ctxWithObserver context.Context, next http.RoundTripper) http.RoundTripper {
+func dbStoreRoundTripper(ctxWithObserver context.Context, dbStorer DBStorer, next http.RoundTripper) http.RoundTripper {
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
-		ctx, o := Get(ctxWithObserver)
+		ctx, o, _ := Get(ctxWithObserver)
 		reqBody := []byte{}
 		if r.Body != nil {
 			defer func() {
@@ -125,9 +126,29 @@ func dbStoreRoundTripper(ctxWithObserver context.Context, next http.RoundTripper
 		}
 
 		duration := time.Since(start)
-		err = o.store(ctx, r.URL.String(), r.Method, int32(resp.StatusCode), duration, reqBody, respBody, r.Header, resp.Header)
+
+		reqHeaders, err := json.Marshal(RedactHeaders(r.Header))
 		if err != nil {
-			return nil, fmt.Errorf("failed to store API request: %w", err)
+			return nil, fmt.Errorf("failed to marshal request headers: %w", err)
+		}
+
+		respHeaders, err := json.Marshal(RedactHeaders(resp.Header))
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal response headers: %w", err)
+		}
+
+		dbStorer.SetURL(r.URL.String())
+		dbStorer.SetMethod(r.Method)
+		dbStorer.SetRequestHeaders(reqHeaders)
+		dbStorer.SetRequestBody(pgtype.Text{String: string(reqBody), Valid: true})
+		dbStorer.SetResponseTimeMS(duration.Milliseconds())
+		dbStorer.SetResponseHeaders(respHeaders)
+		dbStorer.SetResponseBody(pgtype.Text{String: string(respBody), Valid: true})
+		dbStorer.SetStatusCode(int32(resp.StatusCode))
+		err = dbStorer.Exec(ctx)
+		if err != nil {
+			o.Error("failed to store request/response in database", err, SeverityHigh)
+			return nil, fmt.Errorf("failed to store request/response in database: %w", err)
 		}
 
 		return resp, nil
@@ -159,4 +180,17 @@ func metricsRoundTripper(next http.RoundTripper, recorder MetricsRecorder, pathM
 
 		return resp, err
 	})
+}
+
+// DBStorer interface defines methods for storing HTTP request and response details in a database
+type DBStorer interface {
+	SetURL(string)
+	SetMethod(string)
+	SetRequestHeaders([]byte)
+	SetRequestBody(pgtype.Text)
+	SetResponseTimeMS(int64)
+	SetResponseHeaders([]byte)
+	SetResponseBody(pgtype.Text)
+	SetStatusCode(int32)
+	Exec(ctx context.Context) error
 }

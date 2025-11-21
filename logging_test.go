@@ -32,10 +32,10 @@ func TestLoggingContext(t *testing.T) {
 	}()
 
 	o.Error("Test Logging Context", errors.New("TestLoggingContext"), go11y.SeverityHighest, "fatal", 1)
-	ctx, o = go11y.Extend(ctx, nil, "", go11y.FieldRequestID, uuid.New())
+	ctx, o, _ = go11y.Extend(ctx, nil, "", go11y.FieldRequestID, uuid.New())
 	o.Info("TestLoggingContext", nil, "info", 1)
 	ctx = AddFieldsToLoggerInContext(t, ctx, go11y.FieldRequestMethod, "GET", go11y.FieldRequestPath, "/api/v1/test")
-	_, o = go11y.Get(ctx)
+	_, o, _ = go11y.Get(ctx)
 	o.Info("TestLoggingContext", nil, "info", 2)
 
 	// @TODO: read the buffer and check the output matches expected log format
@@ -44,7 +44,7 @@ func TestLoggingContext(t *testing.T) {
 
 func AddFieldsToLoggerInContext(t *testing.T, ctx context.Context, args ...any) (modCtx context.Context) {
 	// Add fields to the logger in the context
-	c, o := go11y.Extend(ctx, args...)
+	c, o, _ := go11y.Extend(ctx, args...)
 
 	o.Info("AddFieldsToLoggerInContext", nil, "info", 1)
 
