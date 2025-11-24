@@ -57,6 +57,29 @@ func SetRequestIDMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// ObserverMiddleware is a middleware that adds the go11y Observer to the request context
+// This allows us to use the go11y Observer in downstream handlers and middlewares without initializing it again or
+// passing it explicitly
+// If the Observer cannot be retrieved from the provided context, an error is returned.
+func ObserverMiddleware(ctxWithObserver context.Context) (observerMiddleware mux.MiddlewareFunc, fault error) {
+	_, o, err := Get(ctxWithObserver)
+	if err != nil {
+		return nil, fmt.Errorf("could not get go11y observer from context: %w", err)
+	}
+
+	mw := func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := AddToContext(r.Context(), o)
+
+			r = r.WithContext(ctx)
+
+			next.ServeHTTP(w, r)
+		})
+	}
+
+	return mw, nil
+}
+
 // Origin represents the origin details of an HTTP request
 type Origin struct {
 	ClientIP  string `json:"client_ip"`
@@ -68,7 +91,9 @@ type Origin struct {
 // RequestLoggerMiddlewareMux is a middleware that logs incoming HTTP requests and their details
 // It extracts tracing information from the request headers and starts a new span for the request
 // It also logs the request details using go11y, adding the go11y Observer to the request context in the process
-func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (metricsMiddleware mux.MiddlewareFunc, fault error) {
+// If the Observer cannot be retrieved from the provided context, an error is returned.
+// If the request context does not already contain a go11y Observer, it is added to the context.
+func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddleware mux.MiddlewareFunc, fault error) {
 	_, o, err := Get(ctxWithObserver)
 	if err != nil {
 		return nil, fmt.Errorf("could not get go11y observer from context: %w", err)
@@ -120,6 +145,10 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (metricsMiddlew
 				return
 			}
 			o.Debug("request received")
+
+			if !InContext(rCtx) {
+				rCtx = AddToContext(rCtx, o)
+			}
 
 			r = r.WithContext(rCtx)
 

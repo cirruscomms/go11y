@@ -368,3 +368,9 @@ func InContext(ctx context.Context) (response bool) {
 func (o *Observer) IncreaseDistance(distance int) {
 	o.skipCallers += distance
 }
+
+// AddToContext adds the Observer to the provided context.
+// This is useful for reducing boilerplate in handlers and middlewares.
+func AddToContext(ctx context.Context, o *Observer) context.Context {
+	return context.WithValue(ctx, obsKeyInstance, o)
+}
