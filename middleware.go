@@ -68,7 +68,7 @@ type Origin struct {
 // RequestLoggerMiddlewareMux is a middleware that logs incoming HTTP requests and their details
 // It extracts tracing information from the request headers and starts a new span for the request
 // It also logs the request details using go11y, adding the go11y Observer to the request context in the process
-func RequestLoggerMiddlewareMux(ctxWithObserver context.Context, next http.Handler) (metricsMiddleware mux.MiddlewareFunc, fault error) {
+func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (metricsMiddleware mux.MiddlewareFunc, fault error) {
 	_, o, err := Get(ctxWithObserver)
 	if err != nil {
 		return nil, fmt.Errorf("could not get go11y observer from context: %w", err)
