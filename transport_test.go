@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cirruscomms/go11y"
+	"github.com/cirruscomms/go11y/storer"
 	testingContainers "github.com/cirruscomms/go11y/tests/containers"
 	"github.com/cirruscomms/go11y/tests/db"
 	"github.com/cirruscomms/go11y/tests/etc/migrations"
@@ -134,7 +135,7 @@ func TestStoringTransport(t *testing.T) {
 		t.Fatalf("failed to run migrations: %v", err)
 	}
 
-	dbStorer, err := db.NewStoreRequest(ctx, ctr.DatabaseURL())
+	dbStorer, err := storer.New(ctx, ctr.DatabaseURL())
 	if err != nil {
 		t.Fatalf("failed to create DB storer: %v", err)
 	}

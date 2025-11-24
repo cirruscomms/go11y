@@ -1,4 +1,6 @@
-package db
+// Package storer provides functionality to store API request and response details in a PostgreSQL database for use by
+// go11y's AddDBStorer transport middleware.
+package storer
 
 import (
 	"context"
@@ -20,8 +22,8 @@ type StoreRequest struct {
 	StatusCode      int32       `db:"status_code" json:"status_code"`
 }
 
-// NewStoreRequest creates a new StoreRequest instance with a database connection pool
-func NewStoreRequest(ctx context.Context, dbConnStr string) (dbStore *StoreRequest, fault error) {
+// New creates a new StoreRequest instance with a database connection pool
+func New(ctx context.Context, dbConnStr string) (dbStore *StoreRequest, fault error) {
 	pool, err := pgxpool.New(ctx, dbConnStr)
 	if err != nil {
 		return nil, err
