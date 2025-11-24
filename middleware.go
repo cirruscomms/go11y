@@ -79,11 +79,10 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (metricsMiddlew
 			// Log&Trace the request
 			prop := otel.GetTextMapPropagator()
 
-			ctx := prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+			rCtx := prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
+			requestID := GetRequestID(rCtx)
 
-			requestID := GetRequestID(ctx)
-
-			ctx = Reset(ctx)
+			ctxWithObserver = Reset(ctxWithObserver)
 
 			args := []any{
 				"origin",
@@ -106,7 +105,7 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (metricsMiddlew
 					trace.WithSpanKind(trace.SpanKindServer),
 					trace.WithAttributes(argsToAttributes(args...)...),
 				}
-				_, span = tracer.Start(ctx, "HTTP "+r.Method+" "+r.URL.Path, opts...)
+				_, span = tracer.Start(ctxWithObserver, "HTTP "+r.Method+" "+r.URL.Path, opts...)
 
 				args = append(args,
 					FieldSpanID, span.SpanContext().SpanID(),
@@ -114,10 +113,15 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (metricsMiddlew
 				)
 			}
 
-			ctx, o, _ := Extend(ctx, args...)
+			_, o, err = Extend(ctxWithObserver, args...)
+			if err != nil {
+				Error("could not extend go11y observer in request logger middleware", err, SeverityHighest)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
 			o.Debug("request received")
 
-			r = r.WithContext(ctx)
+			r = r.WithContext(rCtx)
 
 			// Call the next handler
 			next.ServeHTTP(w, r)
