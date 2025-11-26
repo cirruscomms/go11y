@@ -93,9 +93,9 @@ func (o *Observer) Fatal(msg string, err error, ephemeralArgs ...any) {
 // It will log the fatal error to stderr in the JSON format used by go11y and exit the application.
 func Fatal(msg string, err error, exitCode int, ephemeralArgs ...any) {
 	cfg := &Configuration{
-		logLevel:    LevelInfo,
+		logLevel:    LevelFatal,
 		otelURL:     "",
-		strLevel:    "info",
+		strLevel:    "fatal",
 		databaseURL: "",
 		serviceName: "",
 		trimModules: []string{},
@@ -117,9 +117,9 @@ func Fatal(msg string, err error, exitCode int, ephemeralArgs ...any) {
 // It will log the error to stderr in the JSON format used by go11y.
 func Error(msg string, err error, severity string, ephemeralArgs ...any) {
 	cfg := &Configuration{
-		logLevel:    LevelInfo,
+		logLevel:    LevelError,
 		otelURL:     "",
-		strLevel:    "info",
+		strLevel:    "error",
 		databaseURL: "",
 		serviceName: "",
 		trimModules: []string{},

@@ -52,6 +52,10 @@ func RedactHeaders(headers http.Header) http.Header {
 	for key, values := range headers {
 		if key == "Authorization" || key == "Cookie" {
 			for i := range values {
+				if len(redactedHeaders[key]) == 0 {
+					redactedHeaders[key] = make([]string, len(values))
+				}
+
 				redactedHeaders[key][i] = RedactSecret(values[i], 6)
 			}
 		} else {
