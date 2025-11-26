@@ -23,8 +23,11 @@ const LevelWarning = slog.Level(4)
 // LevelError represents error-level logging
 const LevelError = slog.Level(8)
 
+// LevelPanic represents panic-level logging
+const LevelPanic = slog.Level(16)
+
 // LevelFatal represents fatal-level logging
-const LevelFatal = slog.Level(12)
+const LevelFatal = slog.Level(32)
 
 // StringToLevel maps a string representation of a log level to its corresponding slog.Level.
 func StringToLevel(level string) slog.Level {
@@ -41,6 +44,8 @@ func StringToLevel(level string) slog.Level {
 		return LevelWarning
 	case "error":
 		return LevelError
+	case "panic":
+		return LevelPanic
 	case "fatal":
 		return LevelFatal
 	default:

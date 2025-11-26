@@ -62,5 +62,6 @@ func RedactHeaders(headers http.Header) http.Header {
 			redactedHeaders[key] = values
 		}
 	}
+
 	return redactedHeaders
 }

@@ -206,7 +206,7 @@ func (o *Observer) Close() {
 	}
 
 	if err := o.traceProvider.Shutdown(context.Background()); err != nil {
-		o.Fatal("could not shut down tracer", err)
+		o.Error("could not shut down tracer", err, SeverityMedium)
 	}
 }
 

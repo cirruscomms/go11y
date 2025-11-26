@@ -150,6 +150,8 @@ func TestStoringTransport(t *testing.T) {
 		t.Fatalf("failed to create request: %v", err)
 	}
 
+	req.Header.Set("Authorization", "test-request-id-123")
+
 	resp, err := client.Do(req)
 	if err != nil {
 		t.Fatalf("failed to execute request: %v", err)

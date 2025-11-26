@@ -77,7 +77,8 @@ func (o *Observer) Error(msg string, err error, severity string, ephemeralArgs .
 	}
 }
 
-// Fatal logs a fatal error message, records the error in the span if available, and sets the severity to highest.
+// Fatal logs a fatal error message with the highest severity, records the error in the span if available, and then
+// exits the application abruptly.
 func (o *Observer) Fatal(msg string, err error, ephemeralArgs ...any) {
 	logged := o.error(context.Background(), 3, LevelFatal, msg, append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)...)
 	if logged && o.span != nil {
@@ -89,13 +90,46 @@ func (o *Observer) Fatal(msg string, err error, ephemeralArgs ...any) {
 	os.Exit(1)
 }
 
+// Panic logs a fatal error message with the highest severity, records the error in the span if available, and then
+// exits the application cleanly.
+func (o *Observer) Panic(msg string, err error, ephemeralArgs ...any) {
+	logged := o.error(context.Background(), 3, LevelPanic, msg, append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)...)
+	if logged && o.span != nil {
+		attrs := argsToAttributes(append(o.stableArgs, ephemeralArgs)...)
+		o.span.SetAttributes(attrs...)
+		o.span.RecordError(err)
+	}
+
+	panic(msg)
+}
+
+// Panic is intended to be called before the observer has been configured.
+// It will log the fatal error to stderr in the JSON format used by go11y and exit the application cleanly
+func Panic(msg string, err error, ephemeralArgs ...any) {
+	cfg := &Configuration{
+		logLevel:    LevelInfo,
+		otelURL:     "",
+		strLevel:    "info",
+		databaseURL: "",
+		serviceName: "",
+		trimModules: []string{},
+		trimPaths:   []string{},
+	}
+	ctx := context.Background()
+	_, o, _ := Initialise(ctx, cfg, nil, os.Stderr)
+	ephemeralArgs = append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)
+	o.error(ctx, o.skipCallers, LevelPanic, msg, ephemeralArgs...)
+
+	panic(msg)
+}
+
 // Fatal is intended to be called before the observer has been configured.
-// It will log the fatal error to stderr in the JSON format used by go11y and exit the application.
+// It will log the fatal error to stderr in the JSON format used by go11y and exit the application abruptly.
 func Fatal(msg string, err error, exitCode int, ephemeralArgs ...any) {
 	cfg := &Configuration{
-		logLevel:    LevelFatal,
+		logLevel:    LevelInfo,
 		otelURL:     "",
-		strLevel:    "fatal",
+		strLevel:    "info",
 		databaseURL: "",
 		serviceName: "",
 		trimModules: []string{},
@@ -117,9 +151,9 @@ func Fatal(msg string, err error, exitCode int, ephemeralArgs ...any) {
 // It will log the error to stderr in the JSON format used by go11y.
 func Error(msg string, err error, severity string, ephemeralArgs ...any) {
 	cfg := &Configuration{
-		logLevel:    LevelError,
+		logLevel:    LevelInfo,
 		otelURL:     "",
-		strLevel:    "error",
+		strLevel:    "info",
 		databaseURL: "",
 		serviceName: "",
 		trimModules: []string{},
@@ -129,7 +163,7 @@ func Error(msg string, err error, severity string, ephemeralArgs ...any) {
 	ctx := context.Background()
 	_, o, _ := Initialise(ctx, cfg, nil, os.Stderr)
 	ephemeralArgs = append(ephemeralArgs, "error", err.Error(), "severity", severity)
-	o.error(ctx, o.skipCallers, LevelFatal, msg, ephemeralArgs...)
+	o.error(ctx, o.skipCallers, LevelError, msg, ephemeralArgs...)
 }
 
 // DeduplicateArgs removes duplicate keys from a list of key-value pairs.
