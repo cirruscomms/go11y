@@ -69,7 +69,7 @@ func (o *Observer) Warn(msg string, ephemeralArgs ...any) {
 
 // Error logs an error message, records the error in the span if available, and sets the severity.
 func (o *Observer) Error(msg string, err error, severity string, ephemeralArgs ...any) {
-	logged := o.error(context.Background(), 3, LevelFatal, msg, append(ephemeralArgs, "error", err.Error(), "severity", severity)...)
+	logged := o.error(context.Background(), 3, LevelError, msg, append(ephemeralArgs, "error", err.Error(), "severity", severity)...)
 	if logged && o.span != nil {
 		attrs := argsToAttributes(append(o.stableArgs, ephemeralArgs)...)
 		o.span.SetAttributes(attrs...)
