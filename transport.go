@@ -46,7 +46,7 @@ func logRoundTripper(ctxWithObserver context.Context, next http.RoundTripper) ht
 			FieldRequestHeaders, RedactHeaders(r.Header),
 			FieldRequestMethod, r.Method,
 			FieldRequestURL, r.URL.String(),
-			FieldRequestBody, reqBody,
+			FieldRequestBody, RedactBody(reqBody),
 		}
 
 		o.log(ctx, 8, LevelInfo, "outbound call - request", requestArgs...)
@@ -101,6 +101,9 @@ func dbStoreRoundTripper(ctxWithObserver context.Context, dbStorer DBStorer, nex
 			}
 			// Create a new request with the read body
 			r.Body = io.NopCloser(bytes.NewBuffer(reqBody)) // Use NopCloser to allow reading the body again if needed
+
+			// keep the secrets secret
+			reqBody = RedactBody(reqBody)
 		}
 
 		start := time.Now()
@@ -123,6 +126,9 @@ func dbStoreRoundTripper(ctxWithObserver context.Context, dbStorer DBStorer, nex
 			}
 			// Create a new response with the read body
 			resp.Body = io.NopCloser(bytes.NewBuffer(respBody)) // Use NopCloser to allow reading the body again if needed
+
+			// keep the secrets secret
+			respBody = RedactBody(respBody)
 		}
 
 		duration := time.Since(start)

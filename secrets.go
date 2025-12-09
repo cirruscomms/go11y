@@ -1,10 +1,14 @@
 package go11y
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"regexp"
 	"strings"
 )
+
+var forbiddenKeysRex = regexp.MustCompile(`(authorization|authorisation|cookie|password|.*secret.*|.*key.*|.*token.*)`)
 
 // RedactSecret converts secrets to character-length-character notation, with variable length for the number of
 // characters to reveal on each side, up to a maximum of an eighth on each side.
@@ -50,7 +54,7 @@ func RedactSecret(secretStr string, reveal int) string {
 func RedactHeaders(headers http.Header) http.Header {
 	redactedHeaders := make(http.Header)
 	for key, values := range headers {
-		if key == "Authorization" || key == "Cookie" {
+		if forbiddenKeysRex.MatchString(strings.ToLower(key)) {
 			for i := range values {
 				if len(redactedHeaders[key]) == 0 {
 					redactedHeaders[key] = make([]string, len(values))
@@ -64,4 +68,38 @@ func RedactHeaders(headers http.Header) http.Header {
 	}
 
 	return redactedHeaders
+}
+
+// RedactBody redacts sensitive information from a JSON body.
+func RedactBody(jsonBlob []byte) []byte {
+	body := map[string]any{}
+
+	err := json.Unmarshal(jsonBlob, &body)
+	if err != nil {
+		return jsonBlob
+	}
+
+	body = redactFields(body)
+
+	jsonBlob, err = json.Marshal(body)
+	if err != nil {
+		return jsonBlob
+	}
+
+	return jsonBlob
+}
+
+func redactFields(field map[string]any) map[string]any {
+	for key, value := range field {
+		if forbiddenKeysRex.MatchString(strings.ToLower(key)) {
+			nv := RedactSecret(fmt.Sprintf("%v", value), 6)
+			field[key] = nv
+		}
+
+		switch v := value.(type) {
+		case map[string]any:
+			field[key] = redactFields(v)
+		}
+	}
+	return field
 }
