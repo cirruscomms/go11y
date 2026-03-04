@@ -5,10 +5,14 @@ import (
 	"fmt"
 	"net/http"
 	"regexp"
+	"slices"
 	"strings"
 )
 
-var forbiddenKeysRex = regexp.MustCompile(`(authorization|authorisation|cookie|password|.*secret.*|.*key.*|.*token.*)`)
+var (
+	forbiddenKeysRex = regexp.MustCompile(`(?i)(authorization|authorisation|cookie|password|secret|key|token)`)
+	falsePositives   = []string{"authorizationDate", "authorizationType"}
+)
 
 // RedactSecret converts secrets to character-length-character notation, with variable length for the number of
 // characters to reveal on each side, up to a maximum of an eighth on each side.
@@ -54,7 +58,7 @@ func RedactSecret(secretStr string, reveal int) string {
 func RedactHeaders(headers http.Header) http.Header {
 	redactedHeaders := make(http.Header)
 	for key, values := range headers {
-		if forbiddenKeysRex.MatchString(strings.ToLower(key)) {
+		if forbiddenKeysRex.MatchString(key) && !slices.Contains(falsePositives, key) {
 			for i := range values {
 				if len(redactedHeaders[key]) == 0 {
 					redactedHeaders[key] = make([]string, len(values))
@@ -91,7 +95,7 @@ func RedactBody(jsonBlob []byte) []byte {
 
 func redactFields(field map[string]any) map[string]any {
 	for key, value := range field {
-		if forbiddenKeysRex.MatchString(strings.ToLower(key)) {
+		if forbiddenKeysRex.MatchString(key) && !slices.Contains(falsePositives, key) {
 			nv := RedactSecret(fmt.Sprintf("%v", value), 6)
 			field[key] = nv
 		}

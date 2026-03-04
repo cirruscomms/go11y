@@ -1,8 +1,10 @@
 package go11y
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -144,7 +146,18 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 				http.Error(w, "internal server error", http.StatusInternalServerError)
 				return
 			}
-			o.Debug("request received")
+
+			b, err := io.ReadAll(r.Body)
+			if err != nil {
+				Error("could not read request body in request logger middleware", err, SeverityMedium)
+				http.Error(w, "could not read request body", http.StatusBadRequest)
+				return
+			}
+
+			// Restore the io.ReadCloser to its original state
+			r.Body = io.NopCloser(io.MultiReader(bytes.NewBuffer(b), r.Body))
+
+			o.Debug("request received", "request_body", RedactBody(b))
 
 			if !InContext(rCtx) {
 				rCtx = AddToContext(rCtx, o)
@@ -152,11 +165,18 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 
 			r = r.WithContext(rCtx)
 
+			hw := NewHTTPWriter(w)
 			// Call the next handler
-			next.ServeHTTP(w, r)
+			next.ServeHTTP(hw, r)
+
+			moreArgs := []any{}
+			if resp, ok := hw.(*HTTPWriter); ok {
+				moreArgs = append(moreArgs, "response_body", RedactBody(resp.body))
+				moreArgs = append(moreArgs, "response_status", resp.statusCode)
+			}
 
 			// Log the response
-			o.Debug("request processed", args...)
+			o.Debug("request processed", moreArgs...)
 
 			if o.cfg.OtelURL() != "" {
 				span.End()

@@ -232,12 +232,12 @@ func TestRedactHeaders(t *testing.T) {
 }
 
 func TestRedactBody(t *testing.T) {
-	jsonBlob := `{"email": "test-moose@postman.test.swooop.com.au","password": "DummyPasswordForTesting#2025","first_name": "Fester","last_name": "McTester","more": {"authorization": "redact me"},"email_verified": true,"external_id": "MM00001"}`
-	expected := `{"email":"test-moose@postman.test.swooop.com.au","email_verified":true,"external_id":"MM00001","first_name":"Fester","last_name":"McTester","more":{"authorization":"r[7]e"},"password":"Dum[22]025"}`
+	jsonBlob := `{"email": "test-moose@postman.test.swooop.com.au","password": "DummyPasswordForTesting#2025","first_name": "Fester","last_name": "McTester","more": {"authorization": "redact me"},"email_verified": true,"external_id": "MM00001","authorizationDate": "2024-01-01","authorizationType": "KeyCard","monkey":"banana"}`
+	expected := `{"authorizationDate":"2024-01-01","authorizationType":"KeyCard","email":"test-moose@postman.test.swooop.com.au","email_verified":true,"external_id":"MM00001","first_name":"Fester","last_name":"McTester","monkey":"*4*","more":{"authorization":"r[7]e"},"password":"Dum[22]025"}`
 
 	received := RedactBody([]byte(jsonBlob))
 
 	if string(received) != expected {
-		t.Errorf("expected:\n%v\received:\n%v", expected, string(received))
+		t.Errorf("expected:\n\t%v\nreceived:\n\t%v", expected, string(received))
 	}
 }
