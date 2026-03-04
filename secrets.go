@@ -11,7 +11,7 @@ import (
 
 var (
 	forbiddenKeysRex = regexp.MustCompile(`(?i)(authorization|authorisation|cookie|password|secret|key|token)`)
-	falsePositives   = []string{"authorizationDate", "authorizationType"}
+	falsePositives   = []string{"authorizationDate", "authorisationDate", "authorizationType", "authorisationType"}
 )
 
 // RedactSecret converts secrets to character-length-character notation, with variable length for the number of
