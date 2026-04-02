@@ -8,6 +8,8 @@ import (
 )
 
 // Develop logs a development-only message and adds an event to the span if available.
+// $msg is the message to log
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func (o *Observer) Develop(msg string, ephemeralArgs ...any) {
 	logged := o.log(context.Background(), 3, LevelDevelop, msg, ephemeralArgs...)
 	if logged && o.span != nil {
@@ -18,6 +20,8 @@ func (o *Observer) Develop(msg string, ephemeralArgs ...any) {
 }
 
 // Debug logs a debug message and adds an event to the span if available.
+// $msg is the message to log
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes
 func (o *Observer) Debug(msg string, ephemeralArgs ...any) {
 	logged := o.log(context.Background(), 3, LevelDebug, msg, ephemeralArgs...)
 	if logged && o.span != nil {
@@ -28,6 +32,8 @@ func (o *Observer) Debug(msg string, ephemeralArgs ...any) {
 }
 
 // Info logs an informational message and adds an event to the span if available.
+// $msg is the message to log
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func (o *Observer) Info(msg string, ephemeralArgs ...any) {
 	logged := o.log(context.Background(), 3, LevelInfo, msg, ephemeralArgs...)
 	if logged && o.span != nil {
@@ -38,6 +44,8 @@ func (o *Observer) Info(msg string, ephemeralArgs ...any) {
 }
 
 // Notice logs a notice message and adds an event to the span if available.
+// $msg is the message to log
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func (o *Observer) Notice(msg string, ephemeralArgs ...any) {
 	logged := o.log(context.Background(), 3, LevelNotice, msg, ephemeralArgs...)
 	if logged && o.span != nil {
@@ -48,6 +56,8 @@ func (o *Observer) Notice(msg string, ephemeralArgs ...any) {
 }
 
 // Warning logs a warning message and adds an event to the span if available.
+// $msg is the message to log
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func (o *Observer) Warning(msg string, ephemeralArgs ...any) {
 	logged := o.log(context.Background(), 3, LevelWarning, msg, ephemeralArgs...)
 	if logged && o.span != nil {
@@ -58,6 +68,8 @@ func (o *Observer) Warning(msg string, ephemeralArgs ...any) {
 }
 
 // Warn a backward compatibility alias for Warning.
+// $msg is the message to log
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func (o *Observer) Warn(msg string, ephemeralArgs ...any) {
 	logged := o.log(context.Background(), 3, LevelWarning, msg, ephemeralArgs...)
 	if logged && o.span != nil {
@@ -68,6 +80,10 @@ func (o *Observer) Warn(msg string, ephemeralArgs ...any) {
 }
 
 // Error logs an error message, records the error in the span if available, and sets the severity.
+// $msg is the message to log
+// $err is the error to record in the span and include in the log
+// $severity is a string representing the severity of the error (e.g., "low", "medium", "high")
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func (o *Observer) Error(msg string, err error, severity string, ephemeralArgs ...any) {
 	logged := o.error(context.Background(), 3, LevelError, msg, append(ephemeralArgs, "error", err.Error(), "severity", severity)...)
 	if logged && o.span != nil {
@@ -79,6 +95,9 @@ func (o *Observer) Error(msg string, err error, severity string, ephemeralArgs .
 
 // Fatal logs a fatal error message with the highest severity, records the error in the span if available, and then
 // exits the application abruptly.
+// $msg is the message to log
+// $err is the error to record in the span and include in the log
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func (o *Observer) Fatal(msg string, err error, ephemeralArgs ...any) {
 	logged := o.error(context.Background(), 3, LevelFatal, msg, append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)...)
 	if logged && o.span != nil {
@@ -92,6 +111,9 @@ func (o *Observer) Fatal(msg string, err error, ephemeralArgs ...any) {
 
 // Panic logs a fatal error message with the highest severity, records the error in the span if available, and then
 // exits the application cleanly.
+// $msg is the message to log
+// $err is the error to record in the span and include in the log
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func (o *Observer) Panic(msg string, err error, ephemeralArgs ...any) {
 	logged := o.error(context.Background(), 3, LevelPanic, msg, append(ephemeralArgs, "error", err.Error(), "severity", SeverityHighest)...)
 	if logged && o.span != nil {
@@ -105,6 +127,9 @@ func (o *Observer) Panic(msg string, err error, ephemeralArgs ...any) {
 
 // Panic is intended to be called before the observer has been configured.
 // It will log the fatal error to stderr in the JSON format used by go11y and exit the application cleanly
+// $msg is the message to log
+// $err is the error to record in the span and include in the log
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func Panic(msg string, err error, ephemeralArgs ...any) {
 	cfg := &Configuration{
 		logLevel:    LevelInfo,
@@ -125,6 +150,10 @@ func Panic(msg string, err error, ephemeralArgs ...any) {
 
 // Fatal is intended to be called before the observer has been configured.
 // It will log the fatal error to stderr in the JSON format used by go11y and exit the application abruptly.
+// $msg is the message to log
+// $err is the error to record in the span and include in the log
+// $exitCode is the code to exit the application with (defaults to 1 if less than 1)
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func Fatal(msg string, err error, exitCode int, ephemeralArgs ...any) {
 	cfg := &Configuration{
 		logLevel:    LevelInfo,
@@ -149,6 +178,10 @@ func Fatal(msg string, err error, exitCode int, ephemeralArgs ...any) {
 
 // Error is intended to be called before the observer has been configured.
 // It will log the error to stderr in the JSON format used by go11y.
+// $msg is the message to log
+// $err is the error to record in the span and include in the log
+// $severity is a string representing the severity of the error (e.g., "low", "medium", "high")
+// $ephemeralArgs are any additional key-value pairs to include in the log and span attributes.
 func Error(msg string, err error, severity string, ephemeralArgs ...any) {
 	cfg := &Configuration{
 		logLevel:    LevelInfo,
