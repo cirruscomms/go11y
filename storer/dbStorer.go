@@ -34,6 +34,13 @@ func New(ctx context.Context, dbConnStr string) (dbStore *StoreRequest, fault er
 	}, nil
 }
 
+// NewWithPool returns a new StoreRequest instance with the provided database connection pool
+func NewWithPool(pool *pgxpool.Pool) (dbStore *StoreRequest, fault error) {
+	return &StoreRequest{
+		pool: pool,
+	}, nil
+}
+
 // Exec executes the database insert for the StoreRequest
 func (s *StoreRequest) Exec(ctx context.Context) error {
 	tx, err := s.pool.Begin(ctx)
