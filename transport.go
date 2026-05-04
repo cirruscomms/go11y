@@ -58,30 +58,32 @@ func logRoundTripper(ctxWithObserver context.Context, next http.RoundTripper) ht
 			return nil, err
 		}
 
-		respBody := []byte{}
 		// read the response body, use it to log the response body, then build a new response to return
-		if resp.Body != nil {
-			defer func() {
-				_ = resp.Body.Close()
-			}()
+		if resp != nil {
+			respBody := []byte{}
+			if resp.Body != nil {
+				defer func() {
+					_ = resp.Body.Close()
+				}()
 
-			respBody, err = io.ReadAll(resp.Body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read response body: %w", err)
+				respBody, err = io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read response body: %w", err)
+				}
+				// Create a new response with the read body
+				resp.Body = io.NopCloser(bytes.NewBuffer(respBody)) // Use NopCloser to allow reading the body again if needed
 			}
-			// Create a new response with the read body
-			resp.Body = io.NopCloser(bytes.NewBuffer(respBody)) // Use NopCloser to allow reading the body again if needed
-		}
 
-		duration := time.Since(start)
+			duration := time.Since(start)
 
-		responseArgs := []any{
-			FieldCallDuration, duration,
-			FieldStatusCode, resp.StatusCode,
-			FieldResponseHeaders, RedactHeaders(resp.Header),
-			FieldResponseBody, string(respBody),
+			responseArgs := []any{
+				FieldCallDuration, duration,
+				FieldStatusCode, resp.StatusCode,
+				FieldResponseHeaders, RedactHeaders(resp.Header),
+				FieldResponseBody, string(respBody),
+			}
+			o.log(ctx, 8, LevelInfo, "outbound call - response", responseArgs...)
 		}
-		o.log(ctx, 8, LevelInfo, "outbound call - response", responseArgs...)
 		return resp, nil
 	})
 }
@@ -113,48 +115,51 @@ func dbStoreRoundTripper(ctxWithObserver context.Context, dbStorer DBStorer, nex
 			return nil, err
 		}
 
-		respBody := []byte{}
 		// read the response body, use it to log the response body, then build a new response to return
-		if resp.Body != nil {
-			defer func() {
-				_ = resp.Body.Close()
-			}()
+		if resp != nil {
+			respBody := []byte{}
 
-			respBody, err = io.ReadAll(resp.Body)
-			if err != nil {
-				return nil, fmt.Errorf("failed to read response body: %w", err)
+			if resp.Body != nil {
+				defer func() {
+					_ = resp.Body.Close()
+				}()
+
+				respBody, err = io.ReadAll(resp.Body)
+				if err != nil {
+					return nil, fmt.Errorf("failed to read response body: %w", err)
+				}
+				// Create a new response with the read body
+				resp.Body = io.NopCloser(bytes.NewBuffer(respBody)) // Use NopCloser to allow reading the body again if needed
+
+				// keep the secrets secret
+				respBody = RedactBody(respBody)
 			}
-			// Create a new response with the read body
-			resp.Body = io.NopCloser(bytes.NewBuffer(respBody)) // Use NopCloser to allow reading the body again if needed
 
-			// keep the secrets secret
-			respBody = RedactBody(respBody)
-		}
+			duration := time.Since(start)
 
-		duration := time.Since(start)
+			reqHeaders, err := json.Marshal(RedactHeaders(r.Header))
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal request headers: %w", err)
+			}
 
-		reqHeaders, err := json.Marshal(RedactHeaders(r.Header))
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal request headers: %w", err)
-		}
+			respHeaders, err := json.Marshal(RedactHeaders(resp.Header))
+			if err != nil {
+				return nil, fmt.Errorf("failed to marshal response headers: %w", err)
+			}
 
-		respHeaders, err := json.Marshal(RedactHeaders(resp.Header))
-		if err != nil {
-			return nil, fmt.Errorf("failed to marshal response headers: %w", err)
-		}
-
-		dbStorer.SetURL(r.URL.String())
-		dbStorer.SetMethod(r.Method)
-		dbStorer.SetRequestHeaders(reqHeaders)
-		dbStorer.SetRequestBody(pgtype.Text{String: string(reqBody), Valid: true})
-		dbStorer.SetResponseTimeMS(duration.Milliseconds())
-		dbStorer.SetResponseHeaders(respHeaders)
-		dbStorer.SetResponseBody(pgtype.Text{String: string(respBody), Valid: true})
-		dbStorer.SetStatusCode(int32(resp.StatusCode))
-		err = dbStorer.Exec(ctx)
-		if err != nil {
-			o.Error("failed to store request/response in database", err, SeverityHigh)
-			return nil, fmt.Errorf("failed to store request/response in database: %w", err)
+			dbStorer.SetURL(r.URL.String())
+			dbStorer.SetMethod(r.Method)
+			dbStorer.SetRequestHeaders(reqHeaders)
+			dbStorer.SetRequestBody(pgtype.Text{String: string(reqBody), Valid: true})
+			dbStorer.SetResponseTimeMS(duration.Milliseconds())
+			dbStorer.SetResponseHeaders(respHeaders)
+			dbStorer.SetResponseBody(pgtype.Text{String: string(respBody), Valid: true})
+			dbStorer.SetStatusCode(int32(resp.StatusCode))
+			err = dbStorer.Exec(ctx)
+			if err != nil {
+				o.Error("failed to store request/response in database", err, SeverityHigh)
+				return nil, fmt.Errorf("failed to store request/response in database: %w", err)
+			}
 		}
 
 		return resp, nil
@@ -182,7 +187,9 @@ func metricsRoundTripper(next http.RoundTripper, recorder MetricsRecorder, pathM
 			path = pathMaskFunc(path)
 		}
 
-		recorder(resp.StatusCode, r.Method, path, t0)
+		if resp != nil {
+			recorder(resp.StatusCode, r.Method, path, t0)
+		}
 
 		return resp, err
 	})
