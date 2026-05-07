@@ -23,6 +23,12 @@ func (o *Observer) Tracer(name string, opts ...otelTrace.TracerOption) otelTrace
 }
 
 func tracerProvider(ctx context.Context, cfg Configurator) (tracerProvider *otelSDKTrace.TracerProvider, fault error) {
+	if cfg.OtelURL() == "" {
+		// Skip-tracer Randy: if no OTEL URL is provided, we assume the user does not want to set up tracing and we
+		// return nil for the tracer provider
+		return nil, nil
+	}
+
 	headers := map[string]string{
 		"content-type": "application/json",
 	}
@@ -44,7 +50,7 @@ func tracerProvider(ctx context.Context, cfg Configurator) (tracerProvider *otel
 		return nil, fmt.Errorf("failed to create exporter: %w", err)
 	}
 
-	randy := otelSDKTrace.NewTracerProvider(
+	tp := otelSDKTrace.NewTracerProvider(
 		otelSDKTrace.WithBatcher(
 			exporter,
 			otelSDKTrace.WithMaxExportBatchSize(otelSDKTrace.DefaultMaxExportBatchSize),
@@ -59,9 +65,9 @@ func tracerProvider(ctx context.Context, cfg Configurator) (tracerProvider *otel
 		),
 	)
 
-	otel.SetTracerProvider(randy)
+	otel.SetTracerProvider(tp)
 
-	return randy, nil
+	return tp, nil
 }
 
 func argsToAttributes(combinedArgs ...any) []otelAttribute.KeyValue {

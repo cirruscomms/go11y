@@ -204,9 +204,10 @@ func (o *Observer) Close() {
 			s.End()
 		}
 	}
-
-	if err := o.traceProvider.Shutdown(context.Background()); err != nil {
-		o.Error("could not shut down tracer", err, SeverityMedium)
+	if o.traceProvider != nil {
+		if err := o.traceProvider.Shutdown(context.Background()); err != nil {
+			o.Error("could not shut down tracer", err, SeverityMedium)
+		}
 	}
 }
 
