@@ -232,7 +232,7 @@ func GetMetricsMiddlewareMux(ctx context.Context, opts MetricsMiddlewareMuxOpts)
 	prometheus.MustRegister(Requests)
 	prometheus.MustRegister(RequestTimes)
 
-	opts.Router.Handle("/internal/metrics", promhttp.Handler()).Methods(http.MethodGet)
+	opts.Router.Handle("/internal/metrics", promhttp.Handler()).Methods(http.MethodGet).Name("internal-metrics")
 
 	if opts.Swagger != nil {
 		vr, err := oapimux.NewRouter(opts.Swagger)

@@ -1,6 +1,6 @@
 module github.com/cirruscomms/go11y
 
-go 1.25.0
+go 1.26.3
 
 require (
 	github.com/caarlos0/env/v10 v10.0.0
@@ -8,7 +8,7 @@ require (
 	github.com/getkin/kin-openapi v0.133.0
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
-	github.com/jackc/pgx/v5 v5.8.0
+	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jackc/tern/v2 v2.3.3
 	github.com/prometheus/client_golang v1.23.2
 	github.com/testcontainers/testcontainers-go v0.40.0
