@@ -257,7 +257,7 @@ func defaultReplacer(trimModules, trimPaths []string) func(groups []string, a sl
 			case LevelWarning:
 				a.Value = slog.StringValue("WARN")
 			case LevelError:
-				a.Value = slog.StringValue("ERR")
+				a.Value = slog.StringValue("ERROR")
 			case LevelFatal:
 				a.Value = slog.StringValue("FATAL")
 			default:
