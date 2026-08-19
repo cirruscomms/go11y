@@ -370,6 +370,18 @@ func (o *Observer) IncreaseDistance(distance int) {
 	o.skipCallers += distance
 }
 
+// DecreaseDistance decreases the caller skip distance for logging purposes.
+// This is useful when wrapping go11y (such as the go-common splitLog)
+func (o *Observer) DecreaseDistance(distance int) {
+	o.skipCallers -= distance
+}
+
+// SetDistance sets the caller skip distance for logging purposes.
+// This is useful when wrapping go11y (such as the go-common splitLog)
+func (o *Observer) SetDistance(distance int) {
+	o.skipCallers = distance
+}
+
 // AddToContext adds the Observer to the provided context.
 // This is useful for reducing boilerplate in handlers and middlewares.
 func AddToContext(ctx context.Context, o *Observer) context.Context {
