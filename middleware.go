@@ -212,8 +212,8 @@ type PathMask func(path string) (maskedPath string)
 // GetMetricsMiddlewareMux initialises a promhttp metrics route on the provided mux router with a path of
 // /internal/metrics and returns a mux middleware that records request-count and request-time Prometheus metrics for
 // incoming HTTP requests and publishes the values on the endpoint/route.
-func GetMetricsMiddlewareMux(ctx context.Context, opts MetricsMiddlewareMuxOpts) (metricsMiddleware mux.MiddlewareFunc, fault error) {
-	_, o, err := Get(ctx)
+func GetMetricsMiddlewareMux(ctxWithObserver context.Context, opts MetricsMiddlewareMuxOpts) (metricsMiddleware mux.MiddlewareFunc, fault error) {
+	_, o, err := Get(ctxWithObserver)
 	if err != nil {
 		return nil, fmt.Errorf("could not get go11y observer from context: %w", err)
 	}
