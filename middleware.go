@@ -109,7 +109,12 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 			rCtx := prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 			requestID := GetRequestID(rCtx)
 
-			ctxWithObserver = Reset(ctxWithObserver)
+			rCtx, o, err = Reset(ctxWithObserver, rCtx)
+			if err != nil {
+				Error("could not reset go11y observer in request logger middleware", err, SeverityHighest)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
 
 			args := []any{
 				"origin",
@@ -134,13 +139,14 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 				}
 				_, span = tracer.Start(ctxWithObserver, "HTTP "+r.Method+" "+r.URL.Path, opts...)
 
-				args = append(args,
+				args = append(
+					args,
 					FieldSpanID, span.SpanContext().SpanID(),
 					FieldTraceID, span.SpanContext().TraceID(),
 				)
 			}
 
-			_, o, err = Extend(ctxWithObserver, args...)
+			_, o, err = Extend(rCtx, args...)
 			if err != nil {
 				Error("could not extend go11y observer in request logger middleware", err, SeverityHighest)
 				http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -158,10 +164,6 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 			r.Body = io.NopCloser(io.MultiReader(bytes.NewBuffer(b), r.Body))
 
 			o.Debug("request received", "request_body", RedactBody(b))
-
-			if !InContext(rCtx) {
-				rCtx = AddToContext(rCtx, o)
-			}
 
 			r = r.WithContext(rCtx)
 

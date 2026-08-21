@@ -27,7 +27,7 @@ type DatabaseContainer struct {
 
 // Cleanup terminates the Postgres container.
 func (c DatabaseContainer) Cleanup(t testing.TB) {
-	if c.Postgres == nil {
+	if c.Postgres != nil {
 		testcontainers.CleanupContainer(t, c.Postgres)
 	}
 }

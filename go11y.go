@@ -38,8 +38,6 @@ type go11yContextKey string
 
 var obsKeyInstance go11yContextKey = "cirruscomms/go11y"
 
-var ogx *Observer
-
 // Initialise sets up the Observer with the provided configuration, log outputs, and initial arguments.
 func Initialise(
 	ctx context.Context,
@@ -98,18 +96,25 @@ func Initialise(
 }
 
 // Reset resets the Observer in the context to its initial state.
-func Reset(ctxWithGo11y context.Context) (ctxWithResetObservability context.Context) {
-	ctxWithGo11y, o, err := Get(ctxWithGo11y)
+func Reset(ctxWithObserver, ctxNeedsObserver context.Context) (ctxWithResetObservability context.Context, observer *Observer, fault error) {
+	_, o, err := Get(ctxWithObserver)
 	if err != nil {
-		return ctxWithGo11y
+		return ctxWithObserver, nil, err
 	}
 
-	o.outLogger = slog.New(slog.NewJSONHandler(o.output, defaultOptions(o.cfg)))
-	o.errLogger = slog.New(slog.NewJSONHandler(o.output, defaultOptions(o.cfg)))
-	o.Debug("Observer reset")
-	o.stableArgs = []any{}
+	newO := &Observer{
+		cfg:           o.cfg,
+		output:        o.output,
+		outLogger:     slog.New(slog.NewJSONHandler(o.output, defaultOptions(o.cfg))),
+		errLogger:     slog.New(slog.NewJSONHandler(o.output, defaultOptions(o.cfg))),
+		traceProvider: o.traceProvider,
+		stableArgs:    []any{},
+		skipCallers:   o.skipCallers,
+	}
 
-	return context.WithValue(ctxWithGo11y, obsKeyInstance, o)
+	newO.Debug("Observer reset")
+
+	return context.WithValue(ctxNeedsObserver, obsKeyInstance, newO), newO, nil
 }
 
 // Get retrieves the Observer from the context. If none exists, it initializes a new one with default settings.
