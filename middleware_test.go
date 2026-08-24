@@ -5,12 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 	"testing"
 	"time"
 
@@ -45,8 +44,6 @@ func TestRequestLoggerMiddlewareMux(t *testing.T) {
 
 	ctx, cancel := context.WithCancel(t.Context())
 	defer cancel()
-	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
 
 	bufOut := new(bytes.Buffer)
 
@@ -75,14 +72,14 @@ func TestRequestLoggerMiddlewareMux(t *testing.T) {
 	// create a client and use it to send requests to the server
 	client := &http.Client{}
 
-	resp, err := client.Get(fmt.Sprintf("http://%s:%d/", srv.Address, srv.Port))
+	resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/", srv.Port))
 	if err != nil {
 		t.Errorf("could not send request to test server: %v", err)
 	} else {
 		_ = resp.Body.Close()
 	}
 
-	resp, err = client.Post(fmt.Sprintf("http://%s:%d/", srv.Address, srv.Port), "application/json", nil)
+	resp, err = client.Post(fmt.Sprintf("http://127.0.0.1:%d/", srv.Port), "application/json", nil)
 	if err != nil {
 		t.Errorf("could not send request to test server: %v", err)
 	} else {
@@ -90,7 +87,10 @@ func TestRequestLoggerMiddlewareMux(t *testing.T) {
 	}
 
 	// send a termination signal to the server to test graceful shutdown
-	sigChan <- syscall.SIGTERM
+	err = srv.Server.Shutdown(ctx)
+	if err != nil {
+		t.Errorf("could not shutdown test server: %v", err)
+	}
 
 	// wait for the server to shut down gracefully
 	time.Sleep(5 * time.Second)
@@ -134,8 +134,45 @@ func handleRequests() http.Handler {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
-
 		o.Debug("handling request")
+
+		if r.Body != nil {
+			defer func() {
+				_ = r.Body.Close()
+			}()
+
+			b, err := io.ReadAll(r.Body) // read and discard the body
+			if err != nil {
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			if len(b) > 0 {
+				payload := map[string]any{}
+				err = json.Unmarshal(b, &payload)
+				if err != nil {
+					http.Error(w, "internal server error", http.StatusInternalServerError)
+					return
+				}
+
+				ctx := r.Context()
+				for k, v := range payload {
+					switch k {
+					case "delay":
+						if delay, ok := v.(float64); ok {
+							time.Sleep(time.Duration(delay) * time.Millisecond)
+						}
+					}
+
+					ctx, o, err = go11y.Extend(ctx, k, v)
+					if err != nil {
+						http.Error(w, "internal server error", http.StatusInternalServerError)
+						return
+					}
+				}
+				o.Debug("request body processed")
+			}
+		}
 
 		w.WriteHeader(http.StatusOK)
 	})

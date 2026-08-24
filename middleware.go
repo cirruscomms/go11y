@@ -96,7 +96,7 @@ type Origin struct {
 // If the Observer cannot be retrieved from the provided context, an error is returned.
 // If the request context does not already contain a go11y Observer, it is added to the context.
 func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddleware mux.MiddlewareFunc, fault error) {
-	_, o, err := Get(ctxWithObserver)
+	_, _, err := Get(ctxWithObserver)
 	if err != nil {
 		return nil, fmt.Errorf("could not get go11y observer from context: %w", err)
 	}
@@ -109,7 +109,7 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 			rCtx := prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 			requestID := GetRequestID(rCtx)
 
-			rCtx, o, err = Reset(ctxWithObserver, rCtx)
+			rCtx, o, err := Reset(ctxWithObserver, rCtx)
 			if err != nil {
 				Error("could not reset go11y observer in request logger middleware", err, SeverityHighest)
 				http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -137,7 +137,7 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 					trace.WithSpanKind(trace.SpanKindServer),
 					trace.WithAttributes(argsToAttributes(args...)...),
 				}
-				_, span = tracer.Start(ctxWithObserver, "HTTP "+r.Method+" "+r.URL.Path, opts...)
+				rCtx, span = tracer.Start(rCtx, "HTTP "+r.Method+" "+r.URL.Path, opts...)
 
 				args = append(
 					args,
