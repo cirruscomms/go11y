@@ -19,7 +19,7 @@ jira_components:
     WEBS: go11y
 tools:
     golangci-lint:
-        version: 2.12.2
+        version: 2.13.0
     sqlc:
         version: 1.30.0
     tparse:

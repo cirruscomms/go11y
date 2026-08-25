@@ -53,7 +53,6 @@ func tracerProvider(ctx context.Context, cfg Configurator) (tracerProvider *otel
 	tp := otelSDKTrace.NewTracerProvider(
 		otelSDKTrace.WithBatcher(
 			exporter,
-			otelSDKTrace.WithMaxExportBatchSize(otelSDKTrace.DefaultMaxExportBatchSize),
 			otelSDKTrace.WithBatchTimeout(otelSDKTrace.DefaultScheduleDelay*time.Millisecond),
 			otelSDKTrace.WithMaxExportBatchSize(otelSDKTrace.DefaultMaxExportBatchSize),
 		),

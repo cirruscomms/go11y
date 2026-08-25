@@ -66,7 +66,6 @@ func TestLoggingTransport(t *testing.T) {
 	}()
 
 	for {
-		pos := 0
 		l, err := bufOut.ReadString('\n') // Read the first line to ensure logging output is flushed
 		if err != nil {
 			if err.Error() == "EOF" {
@@ -78,7 +77,6 @@ func TestLoggingTransport(t *testing.T) {
 			continue // Skip empty lines
 		}
 		t.Logf("Log output: %s", l)
-		pos++
 	}
 }
 

@@ -63,14 +63,21 @@ func SetRequestIDMiddleware(next http.Handler) http.Handler {
 // This allows us to use the go11y Observer in downstream handlers and middlewares without initializing it again or
 // passing it explicitly
 // If the Observer cannot be retrieved from the provided context, an error is returned.
-func ObserverMiddleware(ctxWithObserver context.Context) (observerMiddleware mux.MiddlewareFunc, fault error) {
-	_, o, err := Get(ctxWithObserver)
-	if err != nil {
-		return nil, fmt.Errorf("could not get go11y observer from context: %w", err)
+func ObserverMiddleware(observer *Observer) (observerMiddleware mux.MiddlewareFunc, fault error) {
+	if observer == nil {
+		return nil, fmt.Errorf("observer cannot be nil")
 	}
 
 	mw := func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			o, err := Reset(observer)
+			if err != nil {
+				Error("could not reset go11y observer in request logger middleware", err, SeverityHighest)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+			o.Debug("Reset go11y observer for request")
+
 			ctx := AddToContext(r.Context(), o)
 
 			r = r.WithContext(ctx)
@@ -95,10 +102,9 @@ type Origin struct {
 // It also logs the request details using go11y, adding the go11y Observer to the request context in the process
 // If the Observer cannot be retrieved from the provided context, an error is returned.
 // If the request context does not already contain a go11y Observer, it is added to the context.
-func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddleware mux.MiddlewareFunc, fault error) {
-	_, o, err := Get(ctxWithObserver)
-	if err != nil {
-		return nil, fmt.Errorf("could not get go11y observer from context: %w", err)
+func RequestLoggerMiddlewareMux(observer *Observer) (loggerMiddleware mux.MiddlewareFunc, fault error) {
+	if observer == nil {
+		return nil, fmt.Errorf("observer cannot be nil")
 	}
 
 	mw := func(next http.Handler) http.Handler {
@@ -109,7 +115,16 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 			rCtx := prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
 			requestID := GetRequestID(rCtx)
 
-			ctxWithObserver = Reset(ctxWithObserver)
+			o, err := Reset(observer)
+			if err != nil {
+				Error("could not reset go11y observer in request logger middleware", err, SeverityHighest)
+				http.Error(w, "internal server error", http.StatusInternalServerError)
+				return
+			}
+
+			o.Debug("Reset go11y observer for request logger")
+
+			rCtx = AddToContext(rCtx, o)
 
 			args := []any{
 				"origin",
@@ -132,15 +147,17 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 					trace.WithSpanKind(trace.SpanKindServer),
 					trace.WithAttributes(argsToAttributes(args...)...),
 				}
-				_, span = tracer.Start(ctxWithObserver, "HTTP "+r.Method+" "+r.URL.Path, opts...)
+				rCtx, span = tracer.Start(rCtx, "HTTP "+r.Method+" "+r.URL.Path, opts...)
+				defer span.End()
 
-				args = append(args,
+				args = append(
+					args,
 					FieldSpanID, span.SpanContext().SpanID(),
 					FieldTraceID, span.SpanContext().TraceID(),
 				)
 			}
 
-			_, o, err = Extend(ctxWithObserver, args...)
+			_, o, err = Extend(rCtx, args...)
 			if err != nil {
 				Error("could not extend go11y observer in request logger middleware", err, SeverityHighest)
 				http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -155,13 +172,9 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 			}
 
 			// Restore the io.ReadCloser to its original state
-			r.Body = io.NopCloser(io.MultiReader(bytes.NewBuffer(b), r.Body))
+			r.Body = io.NopCloser(bytes.NewBuffer(b))
 
 			o.Debug("request received", "request_body", RedactBody(b))
-
-			if !InContext(rCtx) {
-				rCtx = AddToContext(rCtx, o)
-			}
 
 			r = r.WithContext(rCtx)
 
@@ -177,10 +190,6 @@ func RequestLoggerMiddlewareMux(ctxWithObserver context.Context) (loggerMiddlewa
 
 			// Log the response
 			o.Debug("request processed", moreArgs...)
-
-			if o.cfg.OtelURL() != "" {
-				span.End()
-			}
 		})
 	}
 

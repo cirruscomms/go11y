@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -28,17 +29,18 @@ type Observer struct {
 	errLogger     *slog.Logger
 	traceProvider *otelSDKTrace.TracerProvider
 	tracer        otelTrace.Tracer
+	initialArgs   []any
 	stableArgs    []any
 	span          otelTrace.Span
 	spans         []otelTrace.Span
 	skipCallers   int
+	errOutput     io.Writer
+	logOutput     io.Writer
 }
 
 type go11yContextKey string
 
 var obsKeyInstance go11yContextKey = "cirruscomms/go11y"
-
-var ogx *Observer
 
 // Initialise sets up the Observer with the provided configuration, log outputs, and initial arguments.
 func Initialise(
@@ -80,14 +82,20 @@ func Initialise(
 		output:        logOutput,
 		outLogger:     slog.New(slog.NewJSONHandler(logOutput, opts)),
 		errLogger:     slog.New(slog.NewJSONHandler(errOutput, opts)),
+		logOutput:     logOutput,
+		errOutput:     errOutput,
 		traceProvider: tp,
 		stableArgs:    initialArgs,
+		initialArgs:   initialArgs,
 		skipCallers:   3, // default to 3 but allow it to be increased via o.IncreaseDistance()
 	}
 
 	ctx = context.WithValue(ctx, obsKeyInstance, o)
 	if len(initialArgs) != 0 {
-		ctx, o, _ = Extend(ctx, initialArgs...)
+		ctx, o, err = Extend(ctx, initialArgs...)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to extend context with initial arguments: %w", err)
+		}
 	}
 
 	slog.SetDefault(o.outLogger)
@@ -98,18 +106,23 @@ func Initialise(
 }
 
 // Reset resets the Observer in the context to its initial state.
-func Reset(ctxWithGo11y context.Context) (ctxWithResetObservability context.Context) {
-	ctxWithGo11y, o, err := Get(ctxWithGo11y)
-	if err != nil {
-		return ctxWithGo11y
+func Reset(originalObserver *Observer) (observer *Observer, fault error) {
+	if originalObserver == nil {
+		return nil, fmt.Errorf("observer cannot be nil")
 	}
 
-	o.outLogger = slog.New(slog.NewJSONHandler(o.output, defaultOptions(o.cfg)))
-	o.errLogger = slog.New(slog.NewJSONHandler(o.output, defaultOptions(o.cfg)))
-	o.Debug("Observer reset")
-	o.stableArgs = []any{}
+	newO := &Observer{
+		cfg:           originalObserver.cfg,
+		output:        originalObserver.output,
+		outLogger:     slog.New(slog.NewJSONHandler(originalObserver.logOutput, defaultOptions(originalObserver.cfg))),
+		errLogger:     slog.New(slog.NewJSONHandler(originalObserver.errOutput, defaultOptions(originalObserver.cfg))),
+		traceProvider: originalObserver.traceProvider,
+		skipCallers:   originalObserver.skipCallers,
+		stableArgs:    originalObserver.initialArgs,
+		initialArgs:   originalObserver.initialArgs,
+	}
 
-	return context.WithValue(ctxWithGo11y, obsKeyInstance, o)
+	return newO, nil
 }
 
 // Get retrieves the Observer from the context. If none exists, it initializes a new one with default settings.
@@ -119,19 +132,23 @@ func Get(ctx context.Context) (ctxWithObserver context.Context, observer *Observ
 		return ctx, nil, fmt.Errorf("go11y Observer not found in context - please initialise go11y first")
 	}
 
-	o := ob.(*Observer)
-
-	return ctx, o, nil
+	if o, ok := ob.(*Observer); ok {
+		return ctx, o, nil
+	}
+	return ctx, nil, fmt.Errorf("go11y Observer not found in context - please initialise go11y first")
 }
 
 // Extend retrieves the Observer from the context and adds new arguments to its logger.
 // If no Observer exists in the context, it initializes a new one with default settings and adds the arguments.
+// LLMs will report that this function mutates the Observer in place, but this is intentional to allow for dynamic
+// updates to the logger's stable arguments.
 func Extend(ctx context.Context, newArgs ...any) (ctxWithGo11y context.Context, observer *Observer, fault error) {
 	ctx, o, err := Get(ctx)
 	if err != nil {
 		return ctx, nil, err
 	}
 
+	// add the newArgs to the existing stableArgs and update the loggers
 	if len(newArgs) != 0 {
 		o.outLogger = o.outLogger.With(newArgs...)
 		o.errLogger = o.errLogger.With(newArgs...)
@@ -170,6 +187,10 @@ func Span(
 // Expand retrieves the Observer from the context, starts a new tracing span with the given name, and adds new arguments
 // to its logger. If no Observer exists in the context, it initializes a new one with default settings and adds the
 // arguments.
+// This is effectively Extend() plus Span() in one function, and is useful for reducing boilerplate in handlers
+// and middlewares.
+// LLMs will report that this function mutates the Observer in place, but this is intentional to allow for dynamic
+// updates to the logger's stable arguments.
 func Expand(
 	ctx context.Context,
 	tracer otelTrace.Tracer,
@@ -196,6 +217,7 @@ func Expand(
 }
 
 // Close ends all active spans and shuts down the trace provider to ensure all traces are flushed.
+// This does not return any error, but logs an error if the trace provider fails to shut down properly.
 func (o *Observer) Close() {
 	if o.span != nil {
 		o.span.End()
@@ -269,8 +291,8 @@ func defaultReplacer(trimModules, trimPaths []string) func(groups []string, a sl
 	}
 }
 
-func (o *Observer) log(ctx context.Context, skipCallers int, level slog.Level, msg string, args ...any) (levelEnabled bool) {
-	if o.outLogger == nil || !o.outLogger.Enabled(ctx, level) {
+func (o *Observer) log(skipCallers int, level slog.Level, msg string, args ...any) (levelEnabled bool) {
+	if o.outLogger == nil || !o.outLogger.Enabled(context.Background(), level) {
 		return false
 	}
 	var pc uintptr
@@ -285,16 +307,13 @@ func (o *Observer) log(ctx context.Context, skipCallers int, level slog.Level, m
 		r.Add(DeduplicateArgs(args)...)
 	}
 
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	_ = o.outLogger.Handler().Handle(ctx, r)
+	_ = o.outLogger.Handler().Handle(context.Background(), r)
 
 	return true
 }
 
-func (o *Observer) error(ctx context.Context, skipCallers int, level slog.Level, msg string, args ...any) (levelEnabled bool) {
-	if o.errLogger == nil || !o.errLogger.Enabled(ctx, level) {
+func (o *Observer) error(skipCallers int, level slog.Level, msg string, args ...any) (levelEnabled bool) {
+	if o.errLogger == nil || !o.errLogger.Enabled(context.Background(), level) {
 		return false
 	}
 	var pc uintptr
@@ -309,51 +328,52 @@ func (o *Observer) error(ctx context.Context, skipCallers int, level slog.Level,
 		r.Add(DeduplicateArgs(args)...)
 	}
 
-	if ctx == nil {
-		ctx = context.Background()
-	}
-	_ = o.errLogger.Handler().Handle(ctx, r)
+	_ = o.errLogger.Handler().Handle(context.Background(), r)
 
 	return true
 }
 
-// AddArgs processes the provided arguments, ensuring that they are stable and formatted correctly.
+// AddArgs processes the provided arguments, ensuring that they are stable, unique, ordered, and formatted correctly.
 func (o *Observer) AddArgs(args ...any) (filteredArgs []any) {
 	args = append(o.stableArgs, args...)
 
 	exArgs := map[any]any{}
 
-	for len(args) > 0 {
-		exArgs, args = processArgs(exArgs, args)
+	// Deduplicate the arguments
+	for len(args) > 1 {
+		exArgs[args[0]] = args[1]
+		args = args[2:]
 	}
 
-	resArgs := make([]any, 0, len(exArgs)/2)
-	for k, v := range exArgs {
-		resArgs = append(resArgs, k, v)
+	keys := make([]string, 0, len(exArgs))
+	for k := range exArgs {
+		keys = append(keys, fmt.Sprintf("%v", k))
+	}
+
+	// Sort the keys to maintain a consistent order
+	slices.Sort(keys)
+
+	resArgs := make([]any, 0, len(exArgs)*2)
+	for _, k := range keys {
+		resArgs = append(resArgs, k, exArgs[k])
 	}
 
 	return resArgs
 }
 
-func processArgs(exArgs map[any]any, args []any) (map[any]any, []any) {
-	if len(args) < 2 {
-		return exArgs, []any{}
-	}
-
-	exArgs[args[0]] = args[1]
-
-	return exArgs, args[2:]
-}
-
 // End ends the current tracing span and reverts to the previous span in the stack.
 func (o *Observer) End() {
-	o.span.End()
+	if o.span != nil {
+		o.span.End()
+	}
 
-	o.spans = o.spans[:len(o.spans)-1]
 	if len(o.spans) > 0 {
-		o.span = o.spans[len(o.spans)-1]
-	} else {
-		o.span = nil
+		o.spans = o.spans[:len(o.spans)-1]
+		if len(o.spans) > 0 {
+			o.span = o.spans[len(o.spans)-1]
+		} else {
+			o.span = nil
+		}
 	}
 }
 
