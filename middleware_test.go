@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -29,17 +31,20 @@ const (
 // expected.
 func TestRequestLoggerMiddlewareMux(t *testing.T) {
 	expectedLogs := []string{
-		`{ "time": "2026-07-21T08:00:00Z", "source": {"file":"/middleware_test.go", "function":"github.com/cirruscomms/go11y_test.TestRequestLoggerMiddlewareMux", "line":1}, "level": "INFO", "msg": "Server started successfully", "address": "0.0.0.0", "port": 9011 }`,
-		`{ "time": "2026-07-21T08:00:00Z", "source": {"file":"/go11y.go", "function":"github.com/cirruscomms/go11y.Reset", "line":1}, "level": "DEBUG", "msg": "Observer reset" }`,
-		`{ "time": "2026-07-21T08:00:00Z", "source": {"file":"/middleware.go", "function":"github.com/cirruscomms/go11y.RequestLoggerMiddlewareMux.func1.1", "line":1}, "level": "DEBUG", "msg": "request received", "origin": {"client_ip": "0.0.0.0:0000", "method": "GET", "path": "/", "user_agent": "Go-http-client/1.1"}, "request_body": "" }`,
-		`{ "time": "2026-07-21T08:00:00Z", "source": {"file":"/middleware_test.go", "function":"github.com/cirruscomms/go11y_test.prepareServer.handleRequests.func1", "line":1}, "level": "DEBUG", "msg": "handling request", "origin": {"client_ip": "0.0.0.0:0000", "method": "GET", "path": "/", "user_agent": "Go-http-client/1.1"}, "request_body": "" }`,
-		`{ "time": "2026-07-21T08:00:00Z", "source": {"file":"/middleware.go", "function":"github.com/cirruscomms/go11y.RequestLoggerMiddlewareMux.func1.1", "line":1}, "level": "DEBUG", "msg": "request processed", "origin": {"client_ip": "0.0.0.0:0000", "method": "GET", "path": "/", "user_agent": "Go-http-client/1.1"}, "request_body": "" }`,
-		`{ "time": "2026-07-21T08:00:00Z", "source": {"file":"/go11y.go", "function":"github.com/cirruscomms/go11y.Reset", "line":1}, "level": "DEBUG", "msg": "Observer reset"}`,
-		`{ "time": "2026-07-21T08:00:00Z", "source": {"file":"/middleware.go", "function":"github.com/cirruscomms/go11y.RequestLoggerMiddlewareMux.func1.1", "line":1}, "level": "DEBUG", "msg": "request received", "origin": {"client_ip": "0.0.0.0:0000", "method": "POST", "path": "/", "user_agent": "Go-http-client/1.1"}, "request_body": "" }`,
-		`{ "time": "2026-07-21T08:00:00Z", "source": {"file":"/middleware_test.go", "function":"github.com/cirruscomms/go11y_test.prepareServer.handleRequests.func1", "line":1}, "level": "DEBUG", "msg": "handling request", "origin": {"client_ip": "0.0.0.0:0000", "method": "POST", "path": "/", "user_agent": "Go-http-client/1.1"}, "request_body": "" }`,
-		`{ "time": "2026-07-21T08:00:00Z", "source": {"file":"/middleware.go", "function":"github.com/cirruscomms/go11y.RequestLoggerMiddlewareMux.func1.1", "line":1}, "level": "DEBUG", "msg": "request processed", "origin": {"client_ip": "0.0.0.0:0000", "method": "POST", "path": "/", "user_agent": "Go-http-client/1.1"}, "request_body": "" }`,
-		`{ "time": "2026-07-21T08:00:00Z", "source": {"file":"/middleware_test.go", "function":"github.com/cirruscomms/go11y_test.TestRequestLoggerMiddlewareMux", "line":1}, "level": "INFO", "msg": "Finished testing RequestLoggerMiddlewareMux", "address": "0.0.0.0", "port": 9011 }`,
-		``,
+		`{"time":"2026-08-25T12:38:13.751796+08:00","level":"INFO","source":{"function":"github.com/cirruscomms/go11y_test.TestRequestLoggerMiddlewareMux","file":"/middleware_test.go","line":84},"msg":"Server started successfully","address":"0.0.0.0","port":9011}`,
+		`{"time":"2026-08-25T12:38:13.756618+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y.RequestLoggerMiddlewareMux.func1.1","file":"/middleware.go","line":125},"msg":"Reset go11y observer for request logger"}`,
+		`{"time":"2026-08-25T12:38:13.756909+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y.RequestLoggerMiddlewareMux.func1.1","file":"/middleware.go","line":177},"msg":"request received","origin":{"client_ip":"127.0.0.1:51888","user_agent":"Go-http-client/1.1","method":"POST","path":"/"},"request_id":"b8532d2f-3e99-42b7-b839-6fc3f2f3ecb4","request_body":"eyJkZWxheSI6MjAwMCwia2V5MSI6Iio0KiIsImtleTIiOiIqNCoifQ=="}`,
+		`{"time":"2026-08-25T12:38:13.756924+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y_test.requestHandler.func1","file":"/middleware_test.go","line":189},"msg":"received POST request","origin":{"client_ip":"127.0.0.1:51888","user_agent":"Go-http-client/1.1","method":"POST","path":"/"},"request_id":"b8532d2f-3e99-42b7-b839-6fc3f2f3ecb4"}`,
+		`{"time":"2026-08-25T12:38:13.756944+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y_test.requestHandler.func1","file":"/middleware_test.go","line":217},"msg":"sleeping for a bit","origin":{"client_ip":"127.0.0.1:51888","user_agent":"Go-http-client/1.1","method":"POST","path":"/"},"request_id":"b8532d2f-3e99-42b7-b839-6fc3f2f3ecb4"}`,
+		`{"time":"2026-08-25T12:38:13.757363+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y.RequestLoggerMiddlewareMux.func1.1","file":"/middleware.go","line":125},"msg":"Reset go11y observer for request logger"}`,
+		`{"time":"2026-08-25T12:38:13.757394+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y.RequestLoggerMiddlewareMux.func1.1","file":"/middleware.go","line":177},"msg":"request received","origin":{"client_ip":"127.0.0.1:51889","user_agent":"Go-http-client/1.1","method":"GET","path":"/"},"request_id":"98121712-5381-437f-80a5-477b7ca5c81f","request_body":""}`,
+		`{"time":"2026-08-25T12:38:13.757442+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y_test.requestHandler.func1","file":"/middleware_test.go","line":189},"msg":"received GET request","origin":{"client_ip":"127.0.0.1:51889","user_agent":"Go-http-client/1.1","method":"GET","path":"/"},"request_id":"98121712-5381-437f-80a5-477b7ca5c81f"}`,
+		`{"time":"2026-08-25T12:38:13.757445+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y_test.requestHandler.func1","file":"/middleware_test.go","line":237},"msg":"handled GET request","origin":{"client_ip":"127.0.0.1:51889","user_agent":"Go-http-client/1.1","method":"GET","path":"/"},"request_id":"98121712-5381-437f-80a5-477b7ca5c81f","ephemeral":"arg"}`,
+		`{"time":"2026-08-25T12:38:13.75745+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y.RequestLoggerMiddlewareMux.func1.1","file":"/middleware.go","line":192},"msg":"request processed","origin":{"client_ip":"127.0.0.1:51889","user_agent":"Go-http-client/1.1","method":"GET","path":"/"},"request_id":"98121712-5381-437f-80a5-477b7ca5c81f"}`,
+		`{"time":"2026-08-25T12:38:15.758105+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y_test.requestHandler.func1","file":"/middleware_test.go","line":234},"msg":"request body processed","origin":{"client_ip":"127.0.0.1:51888","user_agent":"Go-http-client/1.1","method":"POST","path":"/"},"request_id":"b8532d2f-3e99-42b7-b839-6fc3f2f3ecb4","delay":2000,"key1":"value1","key2":"value2"}`,
+		`{"time":"2026-08-25T12:38:15.758146+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y_test.requestHandler.func1","file":"/middleware_test.go","line":237},"msg":"handled POST request","origin":{"client_ip":"127.0.0.1:51888","user_agent":"Go-http-client/1.1","method":"POST","path":"/"},"request_id":"b8532d2f-3e99-42b7-b839-6fc3f2f3ecb4","delay":2000,"key1":"value1","key2":"value2","ephemeral":"arg"}`,
+		`{"time":"2026-08-25T12:38:15.758177+08:00","level":"DEBUG","source":{"function":"github.com/cirruscomms/go11y.RequestLoggerMiddlewareMux.func1.1","file":"/middleware.go","line":192},"msg":"request processed","origin":{"client_ip":"127.0.0.1:51888","user_agent":"Go-http-client/1.1","method":"POST","path":"/"},"request_id":"b8532d2f-3e99-42b7-b839-6fc3f2f3ecb4","delay":2000,"key1":"value1","key2":"value2"}`,
+		`{"time":"2026-08-25T12:38:15.758724+08:00","level":"INFO","source":{"function":"github.com/cirruscomms/go11y_test.TestRequestLoggerMiddlewareMux","file":"/middleware_test.go","line":149},"msg":"Finished testing RequestLoggerMiddlewareMux","address":"0.0.0.0","port":9011}`,
 	}
 
 	ctx, cancel := context.WithCancel(t.Context())
@@ -55,7 +60,12 @@ func TestRequestLoggerMiddlewareMux(t *testing.T) {
 		t.Fatalf("could not extend context with go11y observer: %v", err)
 	}
 
-	srv := prepareServer(t, ctx)
+	// Create synchronization channels (buffered to prevent blocking)
+	postStarted := make(chan struct{}, 1)
+	postSleeping := make(chan struct{}, 1)
+	getCompleted := make(chan struct{}, 1)
+
+	srv := prepareServer(t, o, postStarted, postSleeping, getCompleted)
 
 	o.Info("logging with go11y, with stable args")
 
@@ -67,23 +77,67 @@ func TestRequestLoggerMiddlewareMux(t *testing.T) {
 			t.Errorf("could not start test server: %v", err)
 		}
 	}()
+
+	// Give the server a moment to start listening
+	time.Sleep(50 * time.Millisecond)
+
 	o.Info("Server started successfully")
 
 	// create a client and use it to send requests to the server
 	client := &http.Client{}
 
-	resp, err := client.Get(fmt.Sprintf("http://127.0.0.1:%d/", srv.Port))
+	delay := 2000
+
+	body := []byte(fmt.Sprintf(`{"delay": %d, "key1": "value1", "key2": "value2"}`, delay))
+
+	// Channel to capture POST completion
+	postDone := make(chan error, 1)
+
+	// Start POST request in goroutine
+	go func() {
+		resp, err := client.Post(fmt.Sprintf("http://%s:%d/", srv.Address, srv.Port), "application/json", bytes.NewReader(body))
+		if err != nil {
+			postDone <- err
+		} else {
+			_ = resp.Body.Close()
+			postDone <- nil
+		}
+	}()
+
+	// Wait for POST to start and enter sleep phase
+	select {
+	case <-postStarted:
+		// POST request has started
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for POST request to start")
+	}
+
+	select {
+	case <-postSleeping:
+		// POST request is now sleeping
+	case <-time.After(5 * time.Second):
+		t.Fatal("timeout waiting for POST request to enter sleep")
+	}
+
+	// Now send GET request (synchronously)
+	resp, err := client.Get(fmt.Sprintf("http://%s:%d/", srv.Address, srv.Port))
 	if err != nil {
 		t.Errorf("could not send request to test server: %v", err)
 	} else {
 		_ = resp.Body.Close()
 	}
 
-	resp, err = client.Post(fmt.Sprintf("http://127.0.0.1:%d/", srv.Port), "application/json", nil)
-	if err != nil {
-		t.Errorf("could not send request to test server: %v", err)
-	} else {
-		_ = resp.Body.Close()
+	// Signal that GET is complete
+	close(getCompleted)
+
+	// Wait for POST to complete
+	select {
+	case err := <-postDone:
+		if err != nil {
+			t.Errorf("POST request failed: %v", err)
+		}
+	case <-time.After(time.Duration(delay+1000) * time.Millisecond):
+		t.Fatal("timeout waiting for POST request to complete")
 	}
 
 	// send a termination signal to the server to test graceful shutdown
@@ -92,8 +146,6 @@ func TestRequestLoggerMiddlewareMux(t *testing.T) {
 		t.Errorf("could not shutdown test server: %v", err)
 	}
 
-	// wait for the server to shut down gracefully
-	time.Sleep(5 * time.Second)
 	o.Info("Finished testing RequestLoggerMiddlewareMux")
 
 	compareLogs(t, bufOut, expectedLogs)
@@ -105,17 +157,17 @@ type ServerConfig struct {
 	Server  *http.Server
 }
 
-func prepareServer(t *testing.T, ctxWithObserver context.Context) (srvr ServerConfig) {
+func prepareServer(t *testing.T, observer *go11y.Observer, postStarted, postSleeping, getCompleted chan struct{}) (srvr ServerConfig) {
 	rtr := mux.NewRouter()
 
 	// 🔖 Get middleware for logging all requests
-	requestLoggerMiddleware, err := go11y.RequestLoggerMiddlewareMux(ctxWithObserver)
+	requestLoggerMiddleware, err := go11y.RequestLoggerMiddlewareMux(observer)
 	if err != nil {
 		t.Fatalf("could not get request logger middleware: %v", err)
 	}
 
 	rtr.Use(go11y.SetRequestIDMiddleware, requestLoggerMiddleware)
-	rtr.Path("/").Handler(handleRequests()).Methods(http.MethodGet, http.MethodPost)
+	rtr.Path("/").Handler(requestHandler(postStarted, postSleeping, getCompleted)).Methods(http.MethodGet, http.MethodPost)
 	return ServerConfig{
 		Address: Address,
 		Port:    Port,
@@ -127,14 +179,19 @@ func prepareServer(t *testing.T, ctxWithObserver context.Context) (srvr ServerCo
 	}
 }
 
-func handleRequests() http.Handler {
+func requestHandler(postStarted, postSleeping, getCompleted chan struct{}) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, o, err := go11y.Get(r.Context())
 		if err != nil {
 			http.Error(w, "internal server error", http.StatusInternalServerError)
 			return
 		}
-		o.Debug("handling request")
+		o.Debug(fmt.Sprintf("received %s request", r.Method))
+
+		// Signal POST has started
+		if r.Method == http.MethodPost {
+			postStarted <- struct{}{}
+		}
 
 		if r.Body != nil {
 			defer func() {
@@ -155,15 +212,19 @@ func handleRequests() http.Handler {
 					return
 				}
 
+				// First, handle the delay to ensure deterministic ordering
+				if delay, ok := payload["delay"].(float64); ok {
+					o.Debug("sleeping for a bit")
+					// Signal that POST is entering sleep
+					if r.Method == http.MethodPost {
+						postSleeping <- struct{}{}
+					}
+					time.Sleep(time.Duration(delay) * time.Millisecond)
+				}
+
+				// Then extend context with all payload fields
 				ctx := r.Context()
 				for k, v := range payload {
-					switch k {
-					case "delay":
-						if delay, ok := v.(float64); ok {
-							time.Sleep(time.Duration(delay) * time.Millisecond)
-						}
-					}
-
 					ctx, o, err = go11y.Extend(ctx, k, v)
 					if err != nil {
 						http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -173,6 +234,7 @@ func handleRequests() http.Handler {
 				o.Debug("request body processed")
 			}
 		}
+		o.Debug(fmt.Sprintf("handled %s request", r.Method), "ephemeral", "arg")
 
 		w.WriteHeader(http.StatusOK)
 	})
@@ -180,39 +242,58 @@ func handleRequests() http.Handler {
 
 func compareLogs(t *testing.T, bufOut *bytes.Buffer, expectedLogs []string) {
 	str := bufOut.String()
-	receivedLogs := strings.Split(str, "\n")
+	receivedLogs := strings.Split(strings.TrimSpace(str), "\n")
+
 	if len(receivedLogs) != len(expectedLogs) {
 		t.Errorf("expected %d logs, received %d logs", len(expectedLogs), len(receivedLogs))
 	}
 
 	done := &completedFields{}
 
+	passed := true
+
 	for i, receivedLog := range receivedLogs {
 		if i >= len(expectedLogs) {
 			t.Errorf("unexpected log: %s", receivedLog)
+			passed = false
 			continue
 		}
 		switch {
 		case strings.TrimSpace(receivedLog) == "" && strings.TrimSpace(expectedLogs[i]) != "":
 			t.Errorf("log %d is empty, expected: %s", i, expectedLogs[i])
-			continue
+			passed = false
+
 		case strings.TrimSpace(receivedLog) != "" && strings.TrimSpace(expectedLogs[i]) == "":
 			t.Errorf("log %d is not empty, expected empty log", i)
-			continue
+			passed = false
+
 		case strings.TrimSpace(receivedLog) != "" && strings.TrimSpace(expectedLogs[i]) != "":
 
 			received := map[string]any{}
 			expected := map[string]any{}
 			if err := json.Unmarshal([]byte(receivedLog), &received); err != nil {
 				t.Errorf("could not unmarshal received log: %v\n%s", err, receivedLog)
+				passed = false
 				continue
 			}
 			if err := json.Unmarshal([]byte(expectedLogs[i]), &expected); err != nil {
 				t.Errorf("could not unmarshal expected log: %v", err)
+				passed = false
 				continue
 			}
 
-			compareFields(t, done, i, "root", received, expected)
+			child := compareFields(t, done, i, "root", received, expected)
+
+			if !child {
+				passed = false
+			}
+		}
+	}
+
+	if !passed {
+		err := os.WriteFile("middleware_log.tmp", []byte(str), 0o644)
+		if err != nil {
+			t.Errorf("could not write received log to file: %v", err)
 		}
 	}
 
@@ -234,25 +315,52 @@ func (c *completedFields) contains(field string) bool {
 	return false
 }
 
-func compareFields(t *testing.T, done *completedFields, i int, parent string, received, expected map[string]any) {
+func compareFields(t *testing.T, done *completedFields, i int, parent string, received, expected map[string]any) bool {
+	passed := true
 	for k, v := range received {
+		if expected[k] == nil {
+			passed = false
+			t.Errorf("%d-%s) field %s: expected nil, received '%v'", i, parent, k, v)
+		}
+
 		switch k {
-		case "time", "client_ip", "line":
-			// Ignore time and client_ip fields in comparison as the contents is not stable
-			done.add(fmt.Sprintf("%s.%s", parent, k))
-			continue
-		case "origin", "source":
+		case "origin", "source": // Break down the origin and source fields into their subfields and compare them
 			if expected[k] == nil {
+				passed = false
 				t.Errorf("%d-%s) field %s: expected nil, received '%v'", i, parent, k, v)
 			}
-			compareFields(t, done, i, k, v.(map[string]any), expected[k].(map[string]any))
+			children := compareFields(t, done, i, k, v.(map[string]any), expected[k].(map[string]any))
+			if !children {
+				passed = false
+			}
+		case "client_ip": // Don't compare, just check that is is an IP address and port
+			rex := regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}:\d+$`)
+			if !rex.MatchString(fmt.Sprintf("%v", v)) {
+				passed = false
+				t.Errorf("%d-%s) field %s: expected a valid IP address and port, received '%v'", i, parent, k, v)
+			}
+		case "line": // Don't compare, just check that is is a number
+			_, err := strconv.Atoi(fmt.Sprintf("%v", v))
+			if err != nil {
+				passed = false
+				t.Errorf("%d-%s) field %s: expected a number, received '%v'", i, parent, k, v)
+			}
+
+		case "time": // Don't compare, just check that is is a valid time
+			_, err := time.Parse(time.RFC3339, fmt.Sprintf("%v", v))
+			if err != nil {
+				passed = false
+				t.Errorf("%d-%s) field %s: expected a valid time, received '%v'", i, parent, k, v)
+			}
 		case "request_id":
 			_, err := uuid.Parse(fmt.Sprintf("%v", v))
 			if err != nil {
+				passed = false
 				t.Errorf("%d-%s) field %s: expected a valid UUID, received '%v'", i, parent, k, v)
 			}
 		default:
 			if expected[k] != v {
+				passed = false
 				t.Errorf("%d-%s) field %s: expected '%v', received '%v'", i, parent, k, expected[k], v)
 			}
 		}
@@ -264,8 +372,10 @@ func compareFields(t *testing.T, done *completedFields, i int, parent string, re
 			continue
 		}
 
+		passed = false
 		t.Errorf("%d-%s) field %s: expected '%v', received nil", i, parent, k, v)
 	}
+	return passed
 }
 
 type MiddleWareConfig struct{}

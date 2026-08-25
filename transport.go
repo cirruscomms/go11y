@@ -14,6 +14,8 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 )
 
+const roundTripperSkipDistance = 8
+
 // RoundTripperFunc type is an adapter to allow the use of ordinary functions as http.RoundTripper
 type RoundTripperFunc func(*http.Request) (*http.Response, error)
 
@@ -26,7 +28,11 @@ func (rt RoundTripperFunc) RoundTrip(r *http.Request) (*http.Response, error) {
 }
 
 func logRoundTripper(ctxWithObserver context.Context, next http.RoundTripper) http.RoundTripper {
-	ctx, o, _ := Get(ctxWithObserver)
+	_, o, err := Get(ctxWithObserver)
+	if err != nil {
+		Error("could not get go11y observer from context", err, SeverityHigh)
+		return next
+	}
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
 		reqBody := []byte{}
 		if r.Body != nil {
@@ -49,7 +55,7 @@ func logRoundTripper(ctxWithObserver context.Context, next http.RoundTripper) ht
 			FieldRequestBody, RedactBody(reqBody),
 		}
 
-		o.log(ctx, 8, LevelInfo, "outbound call - request", requestArgs...)
+		o.log(roundTripperSkipDistance, LevelInfo, "outbound call - request", requestArgs...)
 		start := time.Now()
 
 		// Send the actual request
@@ -80,17 +86,22 @@ func logRoundTripper(ctxWithObserver context.Context, next http.RoundTripper) ht
 				FieldCallDuration, duration,
 				FieldStatusCode, resp.StatusCode,
 				FieldResponseHeaders, RedactHeaders(resp.Header),
-				FieldResponseBody, string(respBody),
+				FieldResponseBody, RedactBody(respBody),
 			}
-			o.log(ctx, 8, LevelInfo, "outbound call - response", responseArgs...)
+			o.log(roundTripperSkipDistance, LevelInfo, "outbound call - response", responseArgs...)
 		}
 		return resp, nil
 	})
 }
 
 func dbStoreRoundTripper(ctxWithObserver context.Context, dbStorer DBStorer, next http.RoundTripper) http.RoundTripper {
+	_, o, err := Get(ctxWithObserver)
+	if err != nil {
+		Error("could not get go11y observer from context", err, SeverityHigh)
+		return next
+	}
+
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
-		ctx, o, _ := Get(ctxWithObserver)
 		reqBody := []byte{}
 		if r.Body != nil {
 			defer func() {
@@ -155,7 +166,7 @@ func dbStoreRoundTripper(ctxWithObserver context.Context, dbStorer DBStorer, nex
 			dbStorer.SetResponseHeaders(respHeaders)
 			dbStorer.SetResponseBody(pgtype.Text{String: string(respBody), Valid: true})
 			dbStorer.SetStatusCode(int32(resp.StatusCode))
-			err = dbStorer.Exec(ctx)
+			err = dbStorer.Exec(ctxWithObserver)
 			if err != nil {
 				o.Error("failed to store request/response in database", err, SeverityHigh)
 				return nil, fmt.Errorf("failed to store request/response in database: %w", err)
