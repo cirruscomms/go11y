@@ -35,7 +35,7 @@ func (c DatabaseContainer) Cleanup(t testing.TB) {
 // MappedPort returns the mapped port for the given container port.
 func (c DatabaseContainer) MappedPort(t testing.TB, ctx context.Context, port string) string {
 	t.Helper()
-	mappedPort, err := c.Postgres.MappedPort(ctx, nat.Port(port))
+	mappedPort, err := c.Postgres.MappedPort(ctx, nat.Port(port).Port())
 	if err != nil {
 		t.Fatalf("could not get mapped port %s: %v", port, err)
 	}
