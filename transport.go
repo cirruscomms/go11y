@@ -206,6 +206,21 @@ func metricsRoundTripper(next http.RoundTripper, recorder MetricsRecorder, pathM
 	})
 }
 
+func requestIDRoundTripper(next http.RoundTripper, serviceName string) http.RoundTripper {
+	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
+		// If the request does not already have a request ID header, set it from the context
+		if r.Header.Get(RequestIDHeader) == "" {
+			requestID := GetRequestID(r.Context())
+			if requestID != "" {
+				r.Header.Set(RequestIDHeader, requestID)
+			}
+		}
+
+		r.Header.Set("User-Agent", serviceName)
+		return next.RoundTrip(r)
+	})
+}
+
 // DBStorer interface defines methods for storing HTTP request and response details in a database
 type DBStorer interface {
 	SetURL(string)

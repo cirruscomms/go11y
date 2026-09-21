@@ -88,7 +88,7 @@ func TestRequestLoggerMiddlewareMux(t *testing.T) {
 
 	delay := 2000
 
-	body := []byte(fmt.Sprintf(`{"delay": %d, "key1": "value1", "key2": "value2"}`, delay))
+	body := fmt.Appendf(nil, `{"delay": %d, "key1": "value1", "key2": "value2"}`, delay)
 
 	// Channel to capture POST completion
 	postDone := make(chan error, 1)
@@ -179,7 +179,7 @@ func prepareServer(t *testing.T, observer *go11y.Observer, postStarted, postSlee
 	}
 }
 
-func requestHandler(postStarted, postSleeping, getCompleted chan struct{}) http.Handler {
+func requestHandler(postStarted, postSleeping, _ chan struct{}) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, o, err := go11y.Get(r.Context())
 		if err != nil {

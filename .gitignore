@@ -2,3 +2,4 @@
 coverage.html
 .DS_Store
 *.tmp
+.claude/*.local.*

@@ -41,12 +41,51 @@ func GetRequestID(ctx context.Context) string {
 	return ""
 }
 
+// TransferRequestID takes the requestID from the context and adds it to the headers of the provided HTTP request.
+func TransferRequestID(ctx context.Context, req *http.Request) {
+	if req == nil {
+		return
+	}
+	if ctx == nil {
+		return
+	}
+
+	requestID := GetRequestID(ctx)
+
+	if requestID != "" {
+		req.Header.Set(RequestIDHeader, requestID)
+	}
+}
+
+// GenerateRequestIDForContext generates a new request ID and adds it to the context.
+func GenerateRequestIDForContext(ctx context.Context) context.Context {
+	if ctx == nil {
+		return ctx
+	}
+
+	ctx = context.WithValue(ctx, RequestIDInstance, uuid.New().String())
+
+	return ctx
+}
+
+// GetRequestIDFromRequest retrieves the request ID from the HTTP request headers.
+func GetRequestIDFromRequest(req *http.Request) string {
+	if req == nil {
+		return ""
+	}
+	return req.Header.Get(RequestIDHeader)
+}
+
 // SetRequestIDMiddleware is a middleware that sets a unique request ID for each incoming HTTP request
 // It generates a new UUID for the request ID, sets it in the request context, and adds it to the response headers
 func SetRequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Generate a new request ID
-		requestID := uuid.New().String()
+		// Retrieve the request ID from the incoming request headers, if it exists.
+		// If not, generate a new one
+		requestID := GetRequestIDFromRequest(r)
+		if requestID == "" {
+			requestID = uuid.New().String()
+		}
 
 		// Set the request ID in the context
 		ctx := context.WithValue(r.Context(), RequestIDInstance, requestID)
