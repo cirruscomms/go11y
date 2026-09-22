@@ -7,11 +7,12 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"uuid"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/routers"
 	oapimux "github.com/getkin/kin-openapi/routers/gorillamux"
-	"github.com/google/uuid"
+
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -28,21 +29,28 @@ const RequestIDInstance requestIDKey = "requestID"
 // RequestIDHeader is a constant for the HTTP header used to store the request ID
 const RequestIDHeader string = "X-Swoop-RequestID"
 
-// GetRequestID retrieves the request ID from the context.
-func GetRequestID(ctx context.Context) string {
+// GetRequestIDFromContext retrieves the request ID from the context. If the context is nil or does not contain a
+// request ID, a new UUID is generated and returned.
+func GetRequestIDFromContext(ctx context.Context) (requestID uuid.UUID) {
 	if ctx == nil {
-		return ""
+		return uuid.New()
 	}
 
-	if requestID, ok := ctx.Value(RequestIDInstance).(string); ok {
-		return requestID
+	reqID := ctx.Value(RequestIDInstance).(string)
+	if reqID == "" {
+		return uuid.New()
 	}
 
-	return ""
+	requestID, err := uuid.Parse(reqID)
+	if err != nil {
+		return uuid.New()
+	}
+
+	return requestID
 }
 
 // TransferRequestID takes the requestID from the context and adds it to the headers of the provided HTTP request.
-func TransferRequestID(ctx context.Context, req *http.Request) {
+func TransferRequestID(ctx context.Context, req *http.Request) (fault error) {
 	if req == nil {
 		return
 	}
@@ -50,30 +58,28 @@ func TransferRequestID(ctx context.Context, req *http.Request) {
 		return
 	}
 
-	requestID := GetRequestID(ctx)
+	requestID := GetRequestIDFromContext(ctx)
 
-	if requestID != "" {
-		req.Header.Set(RequestIDHeader, requestID)
-	}
-}
-
-// GenerateRequestIDForContext generates a new request ID and adds it to the context.
-func GenerateRequestIDForContext(ctx context.Context) context.Context {
-	if ctx == nil {
-		return ctx
-	}
-
-	ctx = context.WithValue(ctx, RequestIDInstance, uuid.New().String())
-
-	return ctx
+	req.Header.Set(RequestIDHeader, requestID.String())
+	return nil
 }
 
 // GetRequestIDFromRequest retrieves the request ID from the HTTP request headers.
-func GetRequestIDFromRequest(req *http.Request) string {
+func GetRequestIDFromRequest(req *http.Request) (requestID uuid.UUID, fault error) {
 	if req == nil {
-		return ""
+		return uuid.UUID{}, fmt.Errorf("request is nil")
 	}
-	return req.Header.Get(RequestIDHeader)
+	reqID := req.Header.Get(RequestIDHeader)
+	if reqID == "" {
+		return uuid.UUID{}, fmt.Errorf("request ID header is missing")
+	}
+
+	requestID, err := uuid.Parse(reqID)
+	if err != nil {
+		return uuid.UUID{}, fmt.Errorf("invalid request ID: %v", err)
+	}
+
+	return requestID, nil
 }
 
 // SetRequestIDMiddleware is a middleware that sets a unique request ID for each incoming HTTP request
@@ -82,9 +88,12 @@ func SetRequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Retrieve the request ID from the incoming request headers, if it exists.
 		// If not, generate a new one
-		requestID := GetRequestIDFromRequest(r)
-		if requestID == "" {
+		requestIDUUID, err := GetRequestIDFromRequest(r)
+		var requestID string
+		if err != nil {
 			requestID = uuid.New().String()
+		} else {
+			requestID = requestIDUUID.String()
 		}
 
 		// Set the request ID in the context
@@ -152,7 +161,7 @@ func RequestLoggerMiddlewareMux(observer *Observer) (loggerMiddleware mux.Middle
 			prop := otel.GetTextMapPropagator()
 
 			rCtx := prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
-			requestID := GetRequestID(rCtx)
+			requestID := GetRequestIDFromContext(rCtx)
 
 			o, err := Reset(observer)
 			if err != nil {
@@ -179,7 +188,7 @@ func RequestLoggerMiddlewareMux(observer *Observer) (loggerMiddleware mux.Middle
 			var span trace.Span
 
 			if o.cfg.OtelURL() != "" {
-				tracer := otel.Tracer(requestID)
+				tracer := otel.Tracer(requestID.String())
 
 				// tracer
 				opts := []trace.SpanStartOption{

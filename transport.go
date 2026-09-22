@@ -208,16 +208,16 @@ func metricsRoundTripper(next http.RoundTripper, recorder MetricsRecorder, pathM
 
 func requestIDRoundTripper(next http.RoundTripper, serviceName string) http.RoundTripper {
 	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
+		nr := r.Clone(r.Context())
+
 		// If the request does not already have a request ID header, set it from the context
-		if r.Header.Get(RequestIDHeader) == "" {
-			requestID := GetRequestID(r.Context())
-			if requestID != "" {
-				r.Header.Set(RequestIDHeader, requestID)
-			}
+		if nr.Header.Get(RequestIDHeader) == "" {
+			requestID := GetRequestIDFromContext(nr.Context())
+			nr.Header.Set(RequestIDHeader, requestID.String())
 		}
 
-		r.Header.Set("User-Agent", serviceName)
-		return next.RoundTrip(r)
+		nr.Header.Set("User-Agent", serviceName)
+		return next.RoundTrip(nr)
 	})
 }
 

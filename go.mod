@@ -1,6 +1,6 @@
 module github.com/cirruscomms/go11y
 
-go 1.26.3
+go 1.27.0
 
 require (
 	github.com/caarlos0/env/v10 v10.0.0

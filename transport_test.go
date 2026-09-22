@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/cirruscomms/go11y"
 	"github.com/cirruscomms/go11y/storer"
 	testingContainers "github.com/cirruscomms/go11y/tests/containers"
@@ -864,10 +866,10 @@ func TestMetricsRoundTripper(t *testing.T) {
 
 func TestRequestIDRoundTripper(t *testing.T) {
 	t.Run("sets the request ID header from the context", func(t *testing.T) {
-		ctx := go11y.GenerateRequestIDForContext(t.Context())
+		ctx := generateRequestIDForContext(t)
 
-		want := go11y.GetRequestID(ctx)
-		if want == "" {
+		want := go11y.GetRequestIDFromContext(ctx)
+		if want.String() == "" {
 			t.Fatalf("expected a generated request ID in the context")
 		}
 
@@ -896,13 +898,13 @@ func TestRequestIDRoundTripper(t *testing.T) {
 			_ = resp.Body.Close()
 		}()
 
-		if got := next.receivedHeaders.Get(go11y.RequestIDHeader); got != want {
+		if got := next.receivedHeaders.Get(go11y.RequestIDHeader); got != want.String() {
 			t.Errorf("expected request ID %q, got %q", want, got)
 		}
 	})
 
 	t.Run("keeps an existing request ID header", func(t *testing.T) {
-		ctx := go11y.GenerateRequestIDForContext(t.Context())
+		ctx := generateRequestIDForContext(t)
 
 		testResp := newTestResponse(http.StatusOK, "", nil)
 		defer func() {
@@ -1166,4 +1168,8 @@ func TestPropagatingTransport(t *testing.T) {
 	defer func() {
 		_ = resp.Body.Close()
 	}()
+}
+
+func generateRequestIDForContext(t *testing.T) context.Context {
+	return context.WithValue(t.Context(), go11y.RequestIDInstance, uuid.New().String())
 }
