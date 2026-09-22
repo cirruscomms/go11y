@@ -2,16 +2,17 @@ package go11y_test
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
 
+	apiClient "github.com/cirruscomms/go-template-service-api/client"
 	"github.com/cirruscomms/go11y"
-	provClient "github.com/cirruscomms/provisioning-service/v3/client/v1"
 )
 
-func provSvcClientWithGo11yTransport(ctxWithObserver context.Context, timeout time.Duration) provClient.ClientOption {
-	return func(c *provClient.Client) error {
+func provSvcClientWithGo11yTransport(ctxWithObserver context.Context, timeout time.Duration) apiClient.ClientOption {
+	return func(c *apiClient.Client) error {
 		httpClient := go11y.HTTPClient{
 			Client: &http.Client{
 				Transport: http.DefaultTransport,
@@ -40,14 +41,22 @@ func ExampleHTTPClient_AddRequestID() {
 		panic(err)
 	}
 
-	provClient, err := provClient.NewClientWithResponses("http://localhost:8080", provSvcClientWithGo11yTransport(ctx, 30*time.Second))
+	templateClient, err := apiClient.NewClientWithResponses("http://localhost:8080", provSvcClientWithGo11yTransport(ctx, 30*time.Second))
 	if err != nil {
 		panic(err)
 	}
 
-	orderID := 123
-	_, err = provClient.GetOrderDetailsV1WithResponse(ctx, orderID)
+	widgetID := fmt.Sprint(rune(123))
+	resp, err := templateClient.WidgetGet(ctx, widgetID)
 	if err != nil {
 		panic(err)
 	}
+
+	defer func() {
+		if resp != nil && resp.Body != nil {
+			_ = resp.Body.Close()
+		}
+	}()
+
+	fmt.Println("Response status:", resp.StatusCode)
 }
