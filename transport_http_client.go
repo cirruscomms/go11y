@@ -6,12 +6,26 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
 // HTTPClient is a wrapper around http.Client that provides methods
 // to add OpenTelemetry tracing, propagation, logging, metrics, and database storage functionality.
 type HTTPClient struct {
 	*http.Client
+}
+
+// AddTracing wraps a http.Client's transporter with OpenTelemetry instrumentation
+// This allows us to capture request and response details in our telemetry data
+// Note: Ensure that the OpenTelemetry SDK and otelhttp package are properly initialized before using this client
+func (c *HTTPClient) AddTracing(ctxWithObserver context.Context) (fault error) {
+	_, _, err := Get(ctxWithObserver)
+	if err != nil {
+		return fmt.Errorf("could not get go11y observer from context: %w", err)
+	}
+	c.Transport = otelhttp.NewTransport(c.Transport)
+	return nil
 }
 
 // AddPropagation wraps a http.Client's transporter with OpenTelemetry propagation

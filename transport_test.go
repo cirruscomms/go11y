@@ -937,7 +937,7 @@ func TestRequestIDRoundTripper(t *testing.T) {
 		}
 	})
 
-	t.Run("leaves the header unset when the context has no request ID", func(t *testing.T) {
+	t.Run("generates a new request ID when the header is unset and the context has no request ID", func(t *testing.T) {
 		testResp := newTestResponse(http.StatusOK, "", nil)
 		defer func() {
 			_ = testResp.Body.Close()
@@ -963,8 +963,8 @@ func TestRequestIDRoundTripper(t *testing.T) {
 			_ = resp.Body.Close()
 		}()
 
-		if got := next.receivedHeaders.Get(go11y.RequestIDHeader); got != "" {
-			t.Errorf("expected no request ID header, got %q", got)
+		if got := next.receivedHeaders.Get(go11y.RequestIDHeader); got == "" {
+			t.Errorf("expected a new request ID to be generated, got empty header")
 		}
 	})
 }
@@ -1171,5 +1171,6 @@ func TestPropagatingTransport(t *testing.T) {
 }
 
 func generateRequestIDForContext(t *testing.T) context.Context {
+	t.Helper()
 	return context.WithValue(t.Context(), go11y.RequestIDInstance, uuid.New().String())
 }

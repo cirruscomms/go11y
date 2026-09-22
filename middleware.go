@@ -36,12 +36,16 @@ func GetRequestIDFromContext(ctx context.Context) (requestID uuid.UUID) {
 		return uuid.New()
 	}
 
-	reqID := ctx.Value(RequestIDInstance).(string)
-	if reqID == "" {
+	reqID := ctx.Value(RequestIDInstance)
+	if reqID == nil {
+		return uuid.New()
+	}
+	reqIDStr, ok := reqID.(string)
+	if !ok || reqIDStr == "" {
 		return uuid.New()
 	}
 
-	requestID, err := uuid.Parse(reqID)
+	requestID, err := uuid.Parse(reqIDStr)
 	if err != nil {
 		return uuid.New()
 	}
@@ -49,13 +53,21 @@ func GetRequestIDFromContext(ctx context.Context) (requestID uuid.UUID) {
 	return requestID
 }
 
-// TransferRequestID takes the requestID from the context and adds it to the headers of the provided HTTP request.
+// TransferRequestID checks if the provided HTTP request and context are valid, and that the request does not already
+// have the request ID header set. If they are valid and the header is unset, it retrieves the requestID from the
+// context and adds it to the headers of the request.
+// NOTE: This is intended for use in hand-crafted client packages, use the AddRequestID Transporter from the go11y
+// HTTPClient for generated clients.
 func TransferRequestID(ctx context.Context, req *http.Request) (fault error) {
 	if req == nil {
-		return
+		return fmt.Errorf("request is nil")
 	}
 	if ctx == nil {
-		return
+		return fmt.Errorf("context is nil")
+	}
+
+	if req.Header.Get(RequestIDHeader) != "" {
+		return nil
 	}
 
 	requestID := GetRequestIDFromContext(ctx)
@@ -82,8 +94,10 @@ func GetRequestIDFromRequest(req *http.Request) (requestID uuid.UUID, fault erro
 	return requestID, nil
 }
 
-// SetRequestIDMiddleware is a middleware that sets a unique request ID for each incoming HTTP request
-// It generates a new UUID for the request ID, sets it in the request context, and adds it to the response headers
+// SetRequestIDMiddleware is a middleware that ensures each incoming HTTP request has a request ID, either the one
+// provided in the incoming request headers or a new one generated if missing.
+// It also adds the requestID to the response headers and ensures that the request ID is available in the request
+// context for downstream handlers.
 func SetRequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Retrieve the request ID from the incoming request headers, if it exists.
