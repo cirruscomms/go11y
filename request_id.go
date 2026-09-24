@@ -1,6 +1,6 @@
 package go11y
 
-// This package provides utilities for managing requestIDs in HTTP requests and contexts.
+// This file contains utilities for managing requestIDs in HTTP requests and contexts.
 // These are used by the go11y middleware and HTTP Transport wrappers to ensure consistent requestID handling between
 // various microservices.
 
