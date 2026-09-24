@@ -7,11 +7,12 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"uuid"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/getkin/kin-openapi/routers"
 	oapimux "github.com/getkin/kin-openapi/routers/gorillamux"
-	"github.com/google/uuid"
+
 	"github.com/gorilla/mux"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -20,33 +21,22 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-type requestIDKey string
-
-// RequestIDInstance is a constant for the context key used to store the request ID
-const RequestIDInstance requestIDKey = "requestID"
-
-// RequestIDHeader is a constant for the HTTP header used to store the request ID
-const RequestIDHeader string = "X-Swoop-RequestID"
-
-// GetRequestID retrieves the request ID from the context.
-func GetRequestID(ctx context.Context) string {
-	if ctx == nil {
-		return ""
-	}
-
-	if requestID, ok := ctx.Value(RequestIDInstance).(string); ok {
-		return requestID
-	}
-
-	return ""
-}
-
-// SetRequestIDMiddleware is a middleware that sets a unique request ID for each incoming HTTP request
-// It generates a new UUID for the request ID, sets it in the request context, and adds it to the response headers
+// SetRequestIDMiddleware is a middleware that ensures each incoming HTTP request has a requestID, either the one
+// provided in the incoming request headers or a new one generated if missing.
+// It also adds the requestID to the response headers and ensures that the request ID is available in the request
+// context for downstream handlers.
+// This middleware should be added first in the middleware chain.
 func SetRequestIDMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Generate a new request ID
-		requestID := uuid.New().String()
+		// Retrieve the request ID from the incoming request headers, if it exists.
+		// If not, generate a new one
+		requestIDUUID, err := GetHTTPRequestID(r)
+		var requestID string
+		if err != nil {
+			requestID = uuid.New().String()
+		} else {
+			requestID = requestIDUUID.String()
+		}
 
 		// Set the request ID in the context
 		ctx := context.WithValue(r.Context(), RequestIDInstance, requestID)
@@ -54,16 +44,20 @@ func SetRequestIDMiddleware(next http.Handler) http.Handler {
 		// Set the request ID in the response header
 		w.Header().Set(RequestIDHeader, requestID)
 
+		r = r.WithContext(ctx)
+
 		// Call the next handler with the new context
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-// ObserverMiddleware is a middleware that adds the go11y Observer to the request context
+// ObserverMiddlewareMux is a middleware that adds the go11y Observer to the request context
 // This allows us to use the go11y Observer in downstream handlers and middlewares without initializing it again or
 // passing it explicitly
 // If the Observer cannot be retrieved from the provided context, an error is returned.
-func ObserverMiddleware(observer *Observer) (observerMiddleware mux.MiddlewareFunc, fault error) {
+// This middleware does not need to be used if the RequestLoggerMiddlewareMux is being used.
+// This middleware should be added as soon as possible in the chain, ideally after the SetRequestIDMiddleware.
+func ObserverMiddlewareMux(observer *Observer) (observerMiddleware mux.MiddlewareFunc, fault error) {
 	if observer == nil {
 		return nil, fmt.Errorf("observer cannot be nil")
 	}
@@ -72,11 +66,11 @@ func ObserverMiddleware(observer *Observer) (observerMiddleware mux.MiddlewareFu
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			o, err := Reset(observer)
 			if err != nil {
-				Error("could not reset go11y observer in request logger middleware", err, SeverityHighest)
+				Error("could not reset go11y observer in observer middleware", err, SeverityHighest)
 				http.Error(w, "internal server error", http.StatusInternalServerError)
 				return
 			}
-			o.Debug("Reset go11y observer for request")
+			o.Develop("Reset go11y observer for Observer middleware")
 
 			ctx := AddToContext(r.Context(), o)
 
@@ -102,6 +96,8 @@ type Origin struct {
 // It also logs the request details using go11y, adding the go11y Observer to the request context in the process
 // If the Observer cannot be retrieved from the provided context, an error is returned.
 // If the request context does not already contain a go11y Observer, it is added to the context.
+// This middleware should be added as soon as possible in the chain, ideally after the SetRequestIDMiddleware.
+// If this middleware is being used, the ObserverMiddleware does not need to be added separately.
 func RequestLoggerMiddlewareMux(observer *Observer) (loggerMiddleware mux.MiddlewareFunc, fault error) {
 	if observer == nil {
 		return nil, fmt.Errorf("observer cannot be nil")
@@ -111,9 +107,7 @@ func RequestLoggerMiddlewareMux(observer *Observer) (loggerMiddleware mux.Middle
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Log&Trace the request
 			prop := otel.GetTextMapPropagator()
-
 			rCtx := prop.Extract(r.Context(), propagation.HeaderCarrier(r.Header))
-			requestID := GetRequestID(rCtx)
 
 			o, err := Reset(observer)
 			if err != nil {
@@ -122,7 +116,13 @@ func RequestLoggerMiddlewareMux(observer *Observer) (loggerMiddleware mux.Middle
 				return
 			}
 
-			o.Debug("Reset go11y observer for request logger")
+			o.Develop("Reset go11y observer for RequestLogger middleware")
+
+			requestID, err := GetContextRequestID(rCtx)
+			if err != nil {
+				o.Develop("Generating requestID from context")
+				requestID = uuid.New()
+			}
 
 			rCtx = AddToContext(rCtx, o)
 
@@ -134,13 +134,14 @@ func RequestLoggerMiddlewareMux(observer *Observer) (loggerMiddleware mux.Middle
 					Method:    r.Method,
 					Path:      r.URL.Path,
 				},
-				FieldRequestID, requestID,
+				FieldRequestID, requestID.String(),
 			}
 
 			var span trace.Span
 
 			if o.cfg.OtelURL() != "" {
-				tracer := otel.Tracer(requestID)
+				blankName := ""
+				tracer := otel.Tracer(blankName) // using a blankName for the tracer results in it using the default name for the provider
 
 				// tracer
 				opts := []trace.SpanStartOption{

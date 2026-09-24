@@ -1,5 +1,6 @@
 // Package storer provides functionality to store API request and response details in a PostgreSQL database for use by
 // go11y's AddDBStorer transport middleware.
+// Deprecated: Should be using go-kafka audit log transport instead.
 package storer
 
 import (
@@ -10,6 +11,7 @@ import (
 )
 
 // StoreRequest struct for storing API request and response details
+// Deprecated: Should be using go-kafka audit log transport instead.
 type StoreRequest struct {
 	pool            *pgxpool.Pool
 	URL             string      `db:"url" json:"url"`
@@ -23,6 +25,7 @@ type StoreRequest struct {
 }
 
 // New creates a new StoreRequest instance with a database connection pool
+// Deprecated: Should be using go-kafka audit log transport instead.
 func New(ctx context.Context, dbConnStr string) (dbStore *StoreRequest, fault error) {
 	pool, err := pgxpool.New(ctx, dbConnStr)
 	if err != nil {
@@ -35,6 +38,7 @@ func New(ctx context.Context, dbConnStr string) (dbStore *StoreRequest, fault er
 }
 
 // NewWithPool returns a new StoreRequest instance with the provided database connection pool
+// Deprecated: Should be using go-kafka audit log transport instead.
 func NewWithPool(pool *pgxpool.Pool) (dbStore *StoreRequest, fault error) {
 	return &StoreRequest{
 		pool: pool,
@@ -42,6 +46,7 @@ func NewWithPool(pool *pgxpool.Pool) (dbStore *StoreRequest, fault error) {
 }
 
 // Exec executes the database insert for the StoreRequest
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *StoreRequest) Exec(ctx context.Context) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -83,41 +88,49 @@ func (s *StoreRequest) Exec(ctx context.Context) error {
 }
 
 // SetURL sets the URL field of the StoreRequest
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *StoreRequest) SetURL(input string) {
 	s.URL = input
 }
 
 // SetMethod sets the Method field of the StoreRequest
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *StoreRequest) SetMethod(input string) {
 	s.Method = input
 }
 
 // SetRequestHeaders sets the RequestHeaders field of the StoreRequest
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *StoreRequest) SetRequestHeaders(input []byte) {
 	s.RequestHeaders = input
 }
 
 // SetRequestBody sets the RequestBody field of the StoreRequest
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *StoreRequest) SetRequestBody(input pgtype.Text) {
 	s.RequestBody = input
 }
 
 // SetResponseTimeMS sets the ResponseTimeMs field of the StoreRequest
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *StoreRequest) SetResponseTimeMS(input int64) {
 	s.ResponseTimeMs = input
 }
 
 // SetResponseHeaders sets the ResponseHeaders field of the StoreRequest
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *StoreRequest) SetResponseHeaders(input []byte) {
 	s.ResponseHeaders = input
 }
 
 // SetResponseBody sets the ResponseBody field of the StoreRequest
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *StoreRequest) SetResponseBody(input pgtype.Text) {
 	s.ResponseBody = input
 }
 
 // SetStatusCode sets the StatusCode field of the StoreRequest
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *StoreRequest) SetStatusCode(input int32) {
 	s.StatusCode = input
 }

@@ -20,6 +20,10 @@ type HTTPClient struct {
 // This allows us to capture request and response details in our telemetry data
 // Note: Ensure that the OpenTelemetry SDK and otelhttp package are properly initialized before using this client
 func (c *HTTPClient) AddTracing(ctxWithObserver context.Context) (fault error) {
+	_, _, err := Get(ctxWithObserver)
+	if err != nil {
+		return fmt.Errorf("could not get go11y observer from context: %w", err)
+	}
 	c.Transport = otelhttp.NewTransport(c.Transport)
 	return nil
 }
@@ -53,6 +57,7 @@ func (c *HTTPClient) AddLogging(ctxWithObserver context.Context) (fault error) {
 // AddDBStore wraps a http.Client's transporter with database storage functionality
 // This allows us to store request and response details in a database for auditing and analysis purposes
 // Note: Ensure that the database connection and storage system are properly initialized before using this client
+// Deprecated: Use HTTPClient.AddAuditLogPublishing() from github.com/cirruscomms/go-kafka/audit/transport instead.
 func (c *HTTPClient) AddDBStore(ctxWithObserver context.Context, dbStorer DBStorer) (fault error) {
 	_, _, err := Get(ctxWithObserver)
 	if err != nil {
@@ -76,6 +81,14 @@ func (c *HTTPClient) AddMetrics(recorder MetricsRecorder, pathMaskFunc PathMask)
 	}
 
 	c.Transport = metricsRoundTripper(c.Transport, recorder, pathMaskFunc)
+
+	return nil
+}
+
+// AddRequestID wraps a http.Client's transporter with request ID tracking and propagation functionality
+// The serviceName parameter is used to set the User-Agent header for the request to the service making the request
+func (c *HTTPClient) AddRequestID(serviceName string) (fault error) {
+	c.Transport = requestIDRoundTripper(c.Transport, serviceName)
 
 	return nil
 }

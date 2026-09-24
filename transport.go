@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"uuid"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.opentelemetry.io/otel"
@@ -203,6 +204,28 @@ func metricsRoundTripper(next http.RoundTripper, recorder MetricsRecorder, pathM
 		}
 
 		return resp, err
+	})
+}
+
+func requestIDRoundTripper(next http.RoundTripper, serviceName string) http.RoundTripper {
+	return RoundTripperFunc(func(r *http.Request) (w *http.Response, fault error) {
+		nr := r.Clone(r.Context())
+
+		// If the request does not already have a request ID header, set it from the context
+		if nr.Header.Get(RequestIDHeader) == "" {
+			ctx := nr.Context()
+			requestID, err := GetContextRequestID(ctx)
+			if err != nil {
+				requestID = uuid.New()
+				ctx = context.WithValue(nr.Context(), RequestIDInstance, requestID.String())
+			}
+
+			nr = nr.WithContext(ctx)
+			nr.Header.Set(RequestIDHeader, requestID.String())
+		}
+
+		nr.Header.Set("User-Agent", serviceName)
+		return next.RoundTrip(nr)
 	})
 }
 
