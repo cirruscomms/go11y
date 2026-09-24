@@ -8,10 +8,11 @@ import (
 	"time"
 
 	apiClient "github.com/cirruscomms/go-template-service-api/client"
+	apiModels "github.com/cirruscomms/go-template-service-api/models"
 	"github.com/cirruscomms/go11y"
 )
 
-func provSvcClientWithGo11yTransport(ctxWithObserver context.Context, timeout time.Duration) apiClient.ClientOption {
+func apiClientWithGo11yTransport(_ context.Context, timeout time.Duration) apiClient.ClientOption {
 	return func(c *apiClient.Client) error {
 		httpClient := go11y.HTTPClient{
 			Client: &http.Client{
@@ -41,12 +42,12 @@ func ExampleHTTPClient_AddRequestID() {
 		panic(err)
 	}
 
-	templateClient, err := apiClient.NewClientWithResponses("http://localhost:8080", provSvcClientWithGo11yTransport(ctx, 30*time.Second))
+	templateClient, err := apiClient.NewClientWithResponses("http://localhost:8080", apiClientWithGo11yTransport(ctx, 30*time.Second))
 	if err != nil {
 		panic(err)
 	}
 
-	widgetID := fmt.Sprint(rune(123))
+	widgetID := apiModels.WidgetID("123")
 	resp, err := templateClient.WidgetGet(ctx, widgetID)
 	if err != nil {
 		panic(err)

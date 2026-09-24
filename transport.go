@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"time"
+	"uuid"
 
 	"github.com/jackc/pgx/v5/pgtype"
 	"go.opentelemetry.io/otel"
@@ -212,7 +213,14 @@ func requestIDRoundTripper(next http.RoundTripper, serviceName string) http.Roun
 
 		// If the request does not already have a request ID header, set it from the context
 		if nr.Header.Get(RequestIDHeader) == "" {
-			requestID := GetRequestIDFromContext(nr.Context())
+			ctx := nr.Context()
+			requestID, err := GetContextRequestID(ctx)
+			if err != nil {
+				requestID = uuid.New()
+				ctx = context.WithValue(nr.Context(), RequestIDInstance, requestID.String())
+			}
+
+			nr = nr.WithContext(ctx)
 			nr.Header.Set(RequestIDHeader, requestID.String())
 		}
 

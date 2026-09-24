@@ -7,7 +7,6 @@ require (
 	github.com/cirruscomms/go-template-service-api v0.1.1
 	github.com/docker/go-connections v0.7.0
 	github.com/getkin/kin-openapi v0.148.0
-	github.com/google/uuid v1.6.0
 	github.com/gorilla/mux v1.8.1
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/jackc/tern/v2 v2.3.3
@@ -51,6 +50,7 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-openapi/jsonpointer v0.22.5 // indirect
 	github.com/go-openapi/swag/jsonname v0.25.5 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect

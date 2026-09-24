@@ -269,22 +269,7 @@ func defaultReplacer(trimModules, trimPaths []string) func(groups []string, a sl
 				level = StringToLevel(fmt.Sprintf("%v", a.Value.Any()))
 			}
 
-			switch level {
-			case LevelDebug:
-				a.Value = slog.StringValue("DEBUG")
-			case LevelInfo:
-				a.Value = slog.StringValue("INFO")
-			case LevelNotice:
-				a.Value = slog.StringValue("NOTICE")
-			case LevelWarning:
-				a.Value = slog.StringValue("WARN")
-			case LevelError:
-				a.Value = slog.StringValue("ERROR")
-			case LevelFatal:
-				a.Value = slog.StringValue("FATAL")
-			default:
-				a.Value = slog.StringValue("DEBUG")
-			}
+			a.Value = LevelToValue(level) // moved to a function to keep the translation alongside the level definitions
 		}
 
 		return a

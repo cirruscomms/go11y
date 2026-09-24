@@ -52,3 +52,32 @@ func StringToLevel(level string) slog.Level {
 		return LevelDebug // default to debug if unknown level
 	}
 }
+
+// LevelToString converts a slog.Level to its string representation.
+func LevelToString(level slog.Level) string {
+	switch level {
+	case LevelDevelop:
+		return "DEVELOP"
+	case LevelDebug:
+		return "DEBUG"
+	case LevelInfo:
+		return "INFO"
+	case LevelNotice:
+		return "NOTICE"
+	case LevelWarning:
+		return "WARN"
+	case LevelError:
+		return "ERROR"
+	case LevelPanic:
+		return "PANIC"
+	case LevelFatal:
+		return "FATAL"
+	default:
+		return "INFO" // default to INFO if unknown level
+	}
+}
+
+// LevelToValue converts a slog.Level to a slog.Value containing its string representation.
+func LevelToValue(level slog.Level) slog.Value {
+	return slog.StringValue(LevelToString(level))
+}

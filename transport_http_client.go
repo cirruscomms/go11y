@@ -57,6 +57,7 @@ func (c *HTTPClient) AddLogging(ctxWithObserver context.Context) (fault error) {
 // AddDBStore wraps a http.Client's transporter with database storage functionality
 // This allows us to store request and response details in a database for auditing and analysis purposes
 // Note: Ensure that the database connection and storage system are properly initialized before using this client
+// Deprecated: Use HTTPClient.AddAuditLogPublishing() from github.com/cirruscomms/go-kafka/audit/transport instead.
 func (c *HTTPClient) AddDBStore(ctxWithObserver context.Context, dbStorer DBStorer) (fault error) {
 	_, _, err := Get(ctxWithObserver)
 	if err != nil {

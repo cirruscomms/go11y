@@ -3,6 +3,7 @@
 // Not all services using go11y's AddDBStorer transport middleware need to implement the cleaner, only those that pass
 // PII to external services though a client using go11y's AddDBStorer transport middleware.
 // Max age of records kept is 180 days
+// Deprecated: Should be using go-kafka audit log transport instead.
 package cleaner
 
 import (
@@ -13,6 +14,7 @@ import (
 )
 
 // Cleaner struct for cleaning up old records created by the storer
+// Deprecated: Should be using go-kafka audit log transport instead.
 type Cleaner struct {
 	pool *pgxpool.Pool
 }
@@ -20,6 +22,7 @@ type Cleaner struct {
 const maxAge = "180 days" // roughly 6 months
 
 // New creates a new Cleaner instance with a database connection pool
+// Deprecated: Should be using go-kafka audit log transport instead.
 func New(ctx context.Context, dbConnStr string) (dbCleaner *Cleaner, fault error) {
 	pool, err := pgxpool.New(ctx, dbConnStr)
 	if err != nil {
@@ -32,6 +35,7 @@ func New(ctx context.Context, dbConnStr string) (dbCleaner *Cleaner, fault error
 }
 
 // Exec cleans the clears out db records created by the storer that are older than 180 days
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *Cleaner) Exec(ctx context.Context) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -56,6 +60,7 @@ func (s *Cleaner) Exec(ctx context.Context) error {
 }
 
 // Close closes the Cleaner's database connection
+// Deprecated: Should be using go-kafka audit log transport instead.
 func (s *Cleaner) Close(ctx context.Context) {
 	s.pool.Close()
 }

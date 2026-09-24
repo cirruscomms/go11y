@@ -12,8 +12,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/google/uuid"
+	"uuid"
 
 	"github.com/cirruscomms/go11y"
 	"github.com/cirruscomms/go11y/storer"
@@ -868,9 +867,9 @@ func TestRequestIDRoundTripper(t *testing.T) {
 	t.Run("sets the request ID header from the context", func(t *testing.T) {
 		ctx := generateRequestIDForContext(t)
 
-		want := go11y.GetRequestIDFromContext(ctx)
-		if want.String() == "" {
-			t.Fatalf("expected a generated request ID in the context")
+		want, err := go11y.GetContextRequestID(ctx)
+		if err != nil {
+			t.Fatalf("expected a generated request ID in the context: %v", err)
 		}
 
 		testResp := newTestResponse(http.StatusOK, "", nil)
