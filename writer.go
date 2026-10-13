@@ -18,6 +18,16 @@ func (w *HTTPWriter) Header() http.Header {
 	return w.http.Header()
 }
 
+// Status returns the captured HTTP status code. If WriteHeader has not been called, it returns 0.
+func (w *HTTPWriter) Status() int32 {
+	return int32(w.statusCode)
+}
+
+// Body returns the captured response body. If Write has not been called, it returns nil.
+func (w *HTTPWriter) Body() []byte {
+	return w.body
+}
+
 // Write writes the data to the connection as part of an HTTP reply.
 func (w *HTTPWriter) Write(data []byte) (int, error) {
 	w.body = append(w.body, data...) // capture the response body for logging
